@@ -1,0 +1,27 @@
+{
+  "name": "agentes-ia-3d",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "install:all": "npm ci && npm --prefix app ci && npm --prefix motor ci",
+    "setup": "node tools/preparar-local.mjs",
+    "local": "node tools/local.mjs",
+    "emulators": "node tools/emuladores.mjs",
+    "seed": "node tools/sembrar-local.mjs",
+    "equipo:bi": "node tools/equipo-bi.mjs",
+    "integraciones:check": "node motor/integraciones-cli.mjs check",
+    "drive:login": "node motor/integraciones-cli.mjs drive-login",
+    "proyecto": "node motor/integraciones-cli.mjs proyecto",
+    "dev": "npm --prefix app run dev -- --host 127.0.0.1",
+    "motor": "npm --prefix motor start",
+    "check": "npm --prefix motor run check",
+    "check:codex": "npm --prefix motor run check:codex",
+    "codex": "npm --prefix motor run codex --",
+    "build": "npm --prefix app run build",
+    "test": "npm --prefix motor test",
+    "test:reglas": "node tools/test-reglas.mjs"
+  },
+  "devDependencies": { "firebase-tools": "15.34.2" }
+}

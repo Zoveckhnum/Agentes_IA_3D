@@ -18,6 +18,15 @@ motor/entregas/
 motor/modelos/
 motor/.claude/
 motor/.agents/
+motor/.codex/
+.local/
+.firebase/
+*-debug.log
+instalacion.json
+motor/integraciones.env
+motor/credenciales/
+motor/proyectos.json
+instalacion.nube.json
 
 # Sistema
 .DS_Store

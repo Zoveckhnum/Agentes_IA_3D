@@ -5,6 +5,19 @@ service cloud.firestore {
     function isAuth() {
       return request.auth != null;
     }
+    function ownerEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+    function isOwner() {
+      return isAuth() && request.auth.token.email == '__CORREO_ADMIN__' && ownerEmailVerified();
+    }
+    function validInitialRole() {
+      return request.resource.data.role == 'pending'
+        || (isOwner() && request.resource.data.role == 'admin')
+        || (request.auth.token.email_verified == true
+          && exists(/databases/$(database)/documents/invites/$(request.auth.token.email))
+          && request.resource.data.role == get(/databases/$(database)/documents/invites/$(request.auth.token.email)).data.role);
+    }
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
@@ -17,35 +30,50 @@ service cloud.firestore {
     function isActiveUser() {
       return isAdmin() || isEmployee();
     }
-    // Motor de agentes (tu PC): usuario robot de correo/contraseña, sin doc en users. /instalar pone su correo.
+    // Motor de agentes (tu PC): usuario robot de correo/contraseña, sin doc en users. la configuración local pone su correo.
     function isAgentBot() {
       return isAuth() && request.auth.token.email == '__CORREO_ROBOT__';
     }
     function isAgentTask(data) {
       return exists(/databases/$(database)/documents/agents/$(data.asignado));
     }
+    function changedInputs() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['tarea', 'descripcion', 'feedback', 'links', 'asignado']);
+    }
+    function validQualityUpdate() {
+      return isAgentBot() || (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'agentOutput'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['qualityStatus']) || request.resource.data.qualityStatus == 'pending')
+        && (!('qualityStatus' in resource.data) || !changedInputs() || request.resource.data.qualityStatus == 'pending')
+      );
+    }
 
     // Users: lectura para autenticados; escritura propia o de admin.
     // CANDADO ANTI-FANTASMA: crear un usuario exige incluir el email real
     // de la cuenta de Google — imposible crear docs sin identidad.
     match /users/{userId} {
-      allow read: if isAuth();
+      allow read: if isActiveUser() || isAgentBot() || (isAuth() && request.auth.uid == userId);
       allow create: if isAuth() && request.auth.uid == userId
-        && request.resource.data.email == request.auth.token.email;
+        && request.resource.data.email == request.auth.token.email && validInitialRole();
       allow update: if isAuth() && (
         isAdmin() ||
-        (request.auth.uid == userId &&
-          (!('email' in resource.data) || request.resource.data.email == resource.data.email))
+        (request.auth.uid == userId && request.resource.data.email == request.auth.token.email && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photo', 'phone', 'bio', 'position', 'color', 'lastSeen'])
+          || (isOwner() && request.resource.data.role == 'admin')
+        ))
       );
       allow delete: if isAdmin();
     }
 
     // Tasks: todos los activos leen; empleados editan solo las suyas; solo admin elimina
     match /tasks/{taskId} {
-      allow read: if isAuth();
+      allow read: if isActiveUser() || isAgentBot();
       // El coordinador (vía el robot) solo puede crear tareas asignadas a agentes
       allow create: if isActiveUser() || (isAgentBot() && isAgentTask(request.resource.data));
-      allow update: if isAuth() && (
+      allow update: if isAuth()
+        && (!('qualityStatus' in resource.data) || request.resource.data.estado != 'completada' || (resource.data.qualityStatus == 'passed' && request.resource.data.qualityStatus == 'passed' && !changedInputs()))
+        && validQualityUpdate()
+        && (
         isAdmin() ||
         (isEmployee() && (
           resource.data.asignado == request.auth.uid ||
@@ -61,13 +89,13 @@ service cloud.firestore {
 
     // Config (lista de clientes): leer todos, escribir solo admin
     match /config/{docId} {
-      allow read: if isAuth();
+      allow read: if isActiveUser() || isAgentBot();
       allow write: if isAdmin() || (isAgentBot() && docId == 'agentWorker');
     }
 
     // Invitaciones: solo admins gestionan; el invitado necesita leer/borrar la suya al registrarse
     match /invites/{email} {
-      allow read, delete: if isAuth();
+      allow read, delete: if isAdmin() || (isAuth() && request.auth.token.email == email);
       allow create, update: if isAdmin();
     }
 

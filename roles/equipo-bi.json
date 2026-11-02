@@ -1,0 +1,62 @@
+[
+  {
+    "nombre": "Coordinador de proyectos",
+    "rol": "coordinador_proyectos",
+    "id": "equipo-bi-coordinador_proyectos"
+  },
+  {
+    "nombre": "Arquitectura y seguridad",
+    "rol": "arquitectura_seguridad",
+    "id": "equipo-bi-arquitectura_seguridad"
+  },
+  {
+    "nombre": "SQL y bases de datos",
+    "rol": "sql_dba",
+    "id": "equipo-bi-sql_dba"
+  },
+  {
+    "nombre": "Ingeniería de datos",
+    "rol": "ingenieria_datos",
+    "id": "equipo-bi-ingenieria_datos"
+  },
+  {
+    "nombre": "BI y analítica",
+    "rol": "bi_analitica",
+    "id": "equipo-bi-bi_analitica"
+  },
+  {
+    "nombre": "Backend e integraciones",
+    "rol": "backend_integraciones",
+    "id": "equipo-bi-backend_integraciones"
+  },
+  {
+    "nombre": "Frontend y portales",
+    "rol": "frontend_portales",
+    "id": "equipo-bi-frontend_portales"
+  },
+  {
+    "nombre": "IA aplicada",
+    "rol": "ia_aplicada",
+    "id": "equipo-bi-ia_aplicada"
+  },
+  {
+    "nombre": "DevOps e infraestructura",
+    "rol": "devops",
+    "id": "equipo-bi-devops"
+  },
+  {
+    "nombre": "QA de software",
+    "rol": "qa_software",
+    "id": "equipo-bi-qa_software"
+  },
+  {
+    "nombre": "QA de datos y BI",
+    "rol": "qa_datos",
+    "id": "equipo-bi-qa_datos"
+  },
+  {
+    "nombre": "Procesos y mejora continua",
+    "rol": "mejora_continua",
+    "id": "equipo-bi-mejora_continua"
+  }
+]

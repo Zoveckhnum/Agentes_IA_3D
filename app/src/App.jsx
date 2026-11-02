@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react'
-import { auth, db, googleProvider } from './firebase.js'
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth'
+import { auth, db, googleProvider, useEmulators } from './firebase.js'
+import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, onSnapshot, orderBy, query, getDocs } from 'firebase/firestore'
 
 import LoginPage from './pages/LoginPage.jsx'
@@ -90,6 +90,13 @@ export default function App() {
   // Real-time listeners
   useEffect(() => {
     if (!user) return
+    const unsubMyProfile = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (snap.exists()) setUserProfile({ uid: user.uid, ...snap.data() })
+    })
+    if (!['admin', 'empleado'].includes(userProfile?.role)) {
+      setTasks([]); setUsers([]); setAgents([])
+      return unsubMyProfile
+    }
     const qTasks = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'))
     const unsubTasks = onSnapshot(qTasks, (snap) => {
       setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })))
@@ -101,15 +108,12 @@ export default function App() {
       if (snap.exists() && snap.data().list) setClients(snap.data().list)
     })
     // Perfil propio en tiempo real: cambios de rol aplican al instante sin re-login
-    const unsubMyProfile = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-      if (snap.exists()) setUserProfile({ uid: user.uid, ...snap.data() })
-    })
     // Agentes de IA (catálogo activo y en reserva)
     const unsubAgents = onSnapshot(collection(db, 'agents'),
       (snap) => setAgents(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       (err) => console.warn('agents:', err.code))
     return () => { unsubTasks(); unsubUsers(); unsubClients(); unsubMyProfile(); unsubAgents() }
-  }, [user])
+  }, [user, userProfile?.role])
 
   // Presencia + tiempo de conexión. Corre SOLO cuando el perfil ya existe,
   // para no crear docs fantasma (sin email/rol) antes que loadOrCreateProfile.
@@ -168,7 +172,6 @@ export default function App() {
       const inviteSnap = await getDoc(doc(db, 'invites', u.email.toLowerCase()))
       if (inviteSnap.exists()) {
         invitedRole = inviteSnap.data().role || 'empleado'
-        await deleteDoc(doc(db, 'invites', u.email.toLowerCase()))
       }
     } catch (e) { /* sin invitación */ }
 
@@ -193,6 +196,7 @@ export default function App() {
       lastSeen: serverTimestamp(),
     }
     await setDoc(ref, profile, { merge: true })
+    if (invitedRole) await deleteDoc(doc(db, 'invites', u.email.toLowerCase())).catch(() => {})
     setUserProfile({ uid: u.uid, ...profile })
   }
 
@@ -220,7 +224,8 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider)
+      if (useEmulators) await signInWithEmailAndPassword(auth, 'admin@oficina.local', 'solo-emulador-local')
+      else await signInWithPopup(auth, googleProvider)
       requestNotifPermission()
     } catch (e) {
       showToast('Error al iniciar sesión', 'error')

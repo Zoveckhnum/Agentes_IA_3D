@@ -1,0 +1,21 @@
+[Unit]
+Description=Motor de Agentes IA con OpenAI Codex
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=agentes
+Group=agentes
+WorkingDirectory=/opt/agentes-ia-3d/motor
+Environment=HOME=/home/agentes
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/agentes-ia-3d/motor/worker.mjs
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

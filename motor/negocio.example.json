@@ -1,5 +1,5 @@
 {
-  "_ayuda": "Copia como negocio.json (o deja que /instalar lo genere). Todo esto lo leen los agentes en cada tarea.",
+  "_ayuda": "Copia como negocio.json (o deja que la configuración local lo genere). Todo esto lo leen los agentes en cada tarea.",
   "nombre": "Mi Empresa",
   "descripcion": "Agencia de marketing digital que ayuda a negocios locales a conseguir clientes con contenido y anuncios.",
   "identidad": "Color principal #4700E0, acento #FFE600, fondo oscuro, tipografía Montserrat, estilo moderno y cercano.",

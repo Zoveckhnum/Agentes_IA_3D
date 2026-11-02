@@ -1,99 +1,146 @@
-# Agentes IA 3D
+# Agentes IA 3D con OpenAI Codex
 
 ![Oficina con agentes de IA](docs/oficina-3d.jpg)
 
-**Una oficina 3D con agentes de IA que trabajan para tu negocio.** Crea tu equipo de agentes (copies, estrategia,
-diseño web, video, imágenes, SEO, asistente personal…), ponles el nombre que quieras, asígnales tareas y míralos
-trabajar en una oficina 3D. Cada entrega llega a "Espera Aprobación": **nada se publica sin ti**.
+Una oficina 3D con agentes de IA: tareas, Kanban, chat y entregables pendientes de aprobación.
+La web, el motor y los datos funcionan en tu PC con **Firebase Emulator Suite**.
+Los agentes usan **OpenAI Codex** y necesitan conexión a OpenAI. No requiere Claude ni un proyecto de Firebase en la nube.
 
-Funciona con **Claude Code** y tu propia suscripción de Claude. Código abierto (MIT), sin cuotas.
+## Arranque local
 
-> Hecho por [Ederland Studio](https://eder-land.com). Si te sirve, dale una ⭐.
+Requisitos: **Node.js 22+**, **Java 21+** y acceso a Codex mediante tu cuenta de ChatGPT o una API key.
+Los límites y el costo dependen de tu cuenta; el proyecto tiene licencia MIT.
 
-## Qué incluye
-
-- **Oficina 3D**: tu equipo humano y tus agentes en tiempo real. Ves quién trabaja, quién está en pausa y quién toma café.
-  El coordinador camina hasta cada agente para entregarle las tareas y te trae los resultados. Gira la vista con `Q` / `E`.
-- **Pipeline de tareas** (Kanban): pendiente → en progreso → espera aprobación → correcciones → completada,
-  con cronómetro, prioridades, clientes y reportes.
-- **Agentes con roles**: elige del catálogo o crea los tuyos. Cada rol define qué herramientas puede usar.
-- **Chat con cada agente y chat de grupo**: los agentes te preguntan lo que les falta y colaboran con `@menciones`.
-- **Asistente coordinador por Telegram** (opcional): háblale por texto o nota de voz, reparte tareas y te avisa
-  cuando un agente termina o necesita información.
-- **Editor de video local**: transcripción con Whisper, corte de silencios y tomas falsas, limpieza de audio,
-  subtítulos y animaciones con código ([HyperFrames](https://github.com/heygen-com/hyperframes)).
-- **Avatares personalizables** para cada persona y agente, con vista previa 3D.
-
-## Cómo instalarlo (con Claude Code)
-
-Necesitas: [Node.js 22+](https://nodejs.org), [Claude Code](https://claude.com/claude-code), una cuenta de Google
-y unos 30 minutos.
+Desde la raíz del repositorio:
 
 ```bash
-git clone https://github.com/ederland/Agentes_IA_3D.git
-cd Agentes_IA_3D
-claude
+npm run install:all
+npm run setup
+npm run codex -- login
+npm run check:codex
+npm run local
 ```
 
-Dentro de Claude Code escribe:
+En Windows, usa `npm.cmd` si PowerShell bloquea `npm.ps1`.
+Si no tienes Java, puedes descargarlo solo para este proyecto:
 
-```
-/instalar
-```
-
-Claude te hará las preguntas (tu negocio, tu marca, tus agentes y sus roles), te guiará para crear tu proyecto
-gratis en Firebase y dejará la app publicada y el motor funcionando.
-
-## Cómo funciona
-
-```
- Tú (app web o Telegram)          Firebase (gratis)              Tu PC
- ───────────────────────    →    ─────────────────    →    ───────────────────────────
- creas tareas, apruebas,          tareas, agentes,           motor/ toma las tareas y las
- chateas con los agentes          chats, equipo              ejecuta con Claude Code
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/java-local.ps1
 ```
 
-- Los agentes trabajan **mientras tu PC está encendido** y el motor corriendo. Usan tu suscripción de Claude.
-- El motor entra a Firebase con un **usuario robot** con permisos mínimos: solo toca tareas de agentes.
-- Tus claves viven solo en `motor/.env` y `app/.env`, que nunca se suben a GitHub.
+El script descarga el JRE 21 de Eclipse Temurin, verifica su SHA-256 y lo extrae en `.local/java/`.
+En macOS/Linux instala Java 21+ y asegúrate de que `java -version` funcione.
 
-## Roles incluidos
+Abre **http://127.0.0.1:5173** y pulsa **Entrar a mi oficina local**.
+Firebase se puede inspeccionar en **http://127.0.0.1:4000**.
+La primera ejecución descarga los emuladores. Todos los servicios escuchan en loopback.
+Puertos: web 5173, Authentication 9099, Firestore 8080, panel 4000, hub 4400, logs 4500 y websocket 9150.
 
-| Rol | Qué hace | Requiere |
-|---|---|---|
-| Asistente personal y coordinador | Correo, calendario, reparte tareas, Telegram | Gmail/Calendar/Telegram opcionales |
-| Copies para redes | Captions, carruseles, guiones cortos | — |
-| LinkedIn y X | Marca personal, posts e hilos | — |
-| Estrategia de marketing | Diagnóstico, oferta, embudo, plan | — |
-| Lanzamientos | Fases, cronograma y piezas | — |
-| Textos largos y SEO | Blogs, webs, emails, VSL | — |
-| Diseño web | Landing pages en HTML | — |
-| Edición de video | Limpieza, subtítulos, animaciones | — |
-| Imágenes | Posts y creativos con IA | Magnific (de pago) |
-| Automatizaciones | Diseña flujos y funnels | — |
-| Investigación | Informes con fuentes | — |
+`npm run local` inicia los emuladores, crea el administrador y robot de prueba, prepara tres agentes
+(Coordinador, Redacción e Investigación) y arranca web y motor. Crea una tarea corta y asígnala a Redacción:
+pasará de Pendiente a En progreso y luego a Espera Aprobación con su entrega de Codex.
+Los usuarios de demostración son `admin@oficina.local` y `robot@oficina.local`,
+con contraseña de prueba `solo-emulador-local`. Se usan exclusivamente en los emuladores.
 
-Agrega los tuyos en [`roles/catalogo.json`](roles/catalogo.json).
+Detén con **Ctrl+C** para exportar los datos a `.local/data/`. Se importan en el próximo arranque.
+Cerrar a la fuerza la terminal puede impedir la exportación. `.local/`, las credenciales, los trabajos
+y las entregas están excluidos de Git. El sembrado no reemplaza agentes existentes ni duplica el equipo.
 
-### Recomendado para el rol de diseño web
+## Configurar Codex y el negocio
 
-El agente de diseño web trabaja mucho mejor con sistemas de diseño instalados como skills de Claude.
-Recomendamos las **[Design Skills de typeui.sh](https://www.typeui.sh/design-skills)** (licencia MIT, de sus autores):
-más de 60 estilos (bento, glassmorphism, brutalism, premium, minimal…). No vienen incluidas en este repositorio;
-instálalas desde su sitio en `motor/.claude/skills/` y el agente las usará solo. El asistente `/instalar` te lo ofrece
-si eliges ese rol.
+- **`AGENTS.md`** y **`motor/AGENTS.md`** contienen las instrucciones que entiende Codex.
+- **`motor/negocio.json`** define negocio, dueño y equipo. **`roles/catalogo.json`** contiene las misiones y capacidades.
+- **`app/.env`** configura la marca y la conexión local. Reinicia la web al cambiarlo.
+- **`motor/.env`** admite `CODEX_MODEL` (vacío usa el modelo predeterminado de Codex).
+- Para autenticación API, introduce tú mismo `CODEX_API_KEY` en `motor/.env`; también se acepta `OPENAI_API_KEY`.
+  Nunca uses variables `VITE_` para una clave privada. Sin clave, se reutiliza la sesión de `codex login`.
+- `npm run setup` conserva los archivos de configuración existentes.
 
-## Estructura
+Puedes abrir este repositorio con Codex y pedirle que personalice el negocio, los roles o las instrucciones.
+No existe un comando `/instalar` de Claude en esta versión.
 
+El motor usa el SDK oficial `@openai/codex-sdk` y el CLI instalado en `motor/node_modules`.
+Procesa eventos JSONL, conserva el identificador de conversación del coordinador de Telegram,
+guarda el uso de tokens y aplica un tiempo máximo de 25 minutos por ejecución.
+El presupuesto `maxTurns` de cada rol limita ahora las invocaciones de herramientas.
+Ejecuta con sandbox `workspace-write`, sin acceso de red de shell y sin aprobaciones interactivas.
+Las reglas de entrega se incluyen explícitamente en cada petición, incluso al reanudar sesiones.
+Las credenciales de Firebase y Telegram no se pasan al proceso de Codex.
+
+### Conectores opcionales
+
+El equipo BI incluye un servidor MCP propio para proyectos: GitHub (lectura, ramas nuevas y PR en borrador)
+y Google Drive (carpetas privadas y entregas versionadas). Consulta la [guía paso a paso de integraciones](docs/INTEGRACIONES.md)
+para preparar GitHub, Telegram y tu Drive personal. Ejecuta `npm run equipo:bi` y `npm run integraciones:check`.
+Los revisores no reciben herramientas de escritura de este servidor. Las tareas técnicas pasan por QA independiente
+y la plataforma bloquea su cierre si la revisión está pendiente, rechazada o bloqueada.
+
+Los conectores de una cuenta Claude **no se transfieren a Codex**. Gmail, Calendar y Magnific
+requieren servidores MCP compatibles configurados por separado en Codex. Los nombres del catálogo son
+orientativos: `herramientas` describe capacidades y activa/desactiva búsqueda web, pero no impone una
+lista de permisos por rol a los servidores MCP. Configura `enabled_tools` en cada servidor y expón solo
+las operaciones que quieras permitir. Los MCP pueden actuar fuera del sandbox de archivos.
+El motor hereda la configuración MCP de tu usuario de Codex.
+
+El servidor de medios incluido se registra desde la raíz con una ruta absoluta:
+
+```bash
+npm run codex -- mcp add agentes-media -- node /ruta/absoluta/Agentes_IA_3D/motor/media-server.mjs
 ```
-app/        App web (React, Vite, Three.js, Firebase)
-motor/      Motor local de agentes (Node + Claude Code)
-roles/      Catálogo de roles y herramientas
-tools/      Configurador e inicio automático
-.claude/    Skill /instalar
+
+En Windows usa tu ruta entre comillas. Para skills de diseño compatibles con Codex, usa
+`motor/.agents/skills/<nombre>/SKILL.md`. Los archivos generados quedan en la carpeta de la tarea
+o, usando el servidor de medios, en `motor/entregas/<agente>/`.
+Telegram sigue siendo opcional: configura `TELEGRAM_BOT_TOKEN` y `TELEGRAM_OWNER_ID` en `motor/integraciones.env`.
+Las herramientas de video y voz pueden descargar modelos al usarse por primera vez.
+
+## Comandos de diagnóstico
+
+| Comando (desde la raíz) | Función |
+|---|---|
+| `npm run local` | Inicia todos los servicios locales |
+| `npm run check:codex` | Verifica autenticación y una respuesta real de Codex; consume una petición |
+| `npm run check` | Verifica conexión y permisos del robot; requiere emuladores activos |
+| `npm test` | Pruebas del adaptador sin llamadas a OpenAI |
+| `npm run build` | Compila la web |
+| `npm run emulators` | Ejecuta solo los emuladores |
+| `npm run seed` | Prepara usuarios y agentes con emuladores ya activos |
+| `npm run dev` / `npm run motor` | Ejecutan web y motor por separado |
+| `npm run equipo:bi` | Prepara los 12 perfiles especializados |
+| `npm run integraciones:check` | Diagnóstico de GitHub, Telegram y Drive |
+| `npm run drive:login` | Autoriza el Drive personal desde el navegador local |
+| `npm run proyecto -- id propietario/repo Nombre` | Registra un repositorio por proyecto |
+| `npm run test:reglas` | Prueba permisos y controles QA contra los emuladores activos |
+
+Si falla el acceso local, revisa que los emuladores están activos y ejecuta `npm run seed`.
+Si Codex devuelve 401 o no tiene sesión, ejecuta `npm run codex -- login`.
+Si hay un puerto ocupado, detén la instancia anterior antes de iniciar otra.
+El indicador “Motor conectado” confirma Firebase; `check:codex` verifica OpenAI por separado.
+
+## Firebase en la nube (opcional)
+
+Para usar un proyecto real, crea Authentication (Google y correo/contraseña), Firestore y el usuario robot.
+Prepara un `instalacion.json` con el formato de `tools/configurar.mjs` y ejecuta:
+
+```bash
+node tools/configurar.mjs instalacion.json
 ```
 
-## Licencia
+El configurador genera los `.env`, conserva las opciones de Codex y desactiva los emuladores.
+Introduce la contraseña del robot en `motor/.env`. Añade `localhost` y `127.0.0.1` a los dominios
+autorizados de Authentication y despliega las reglas generadas usando `--config firebase.cloud.json` en tu proyecto.
+Usa `npm run dev` y `npm run motor` en terminales separadas. No uses `npm run local` con datos de producción.
+Hosting es opcional y no se publica durante la instalación local.
+La [guía de despliegue](docs/DESPLIEGUE.md) explica cómo activar Firebase real, publicar la web
+y mantener el motor en una VM con reinicio automático. No publiques los emuladores.
 
-MIT. Usa, modifica y comparte libremente. Los nombres y marcas de terceros pertenecen a sus dueños;
-el proyecto no incluye personajes con marca registrada: cada negocio nombra a sus agentes.
+## Estructura y licencia
+
+`app/`: React, Vite, Three.js. `motor/`: Node y Codex. `roles/`: catálogo compartido.
+`tools/`: configuración y arranque. `.local/`: Java y datos locales (no versionados).
+
+MIT. Proyecto original de [Ederland Studio](https://eder-land.com).
+
+Referencias: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk),
+[ejecución no interactiva](https://learn.chatgpt.com/docs/non-interactive-mode),
+[Firebase Emulator Suite](https://firebase.google.com/docs/emulator-suite/install_and_configure).

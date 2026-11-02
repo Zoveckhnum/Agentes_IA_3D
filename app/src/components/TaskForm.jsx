@@ -109,6 +109,10 @@ export default function TaskForm() {
 
   const handleSave = async () => {
     if (!form.tarea.trim()) { showToast('Ingresa el nombre de la tarea', 'error'); return }
+    const changedInputs = isEdit && ['tarea', 'descripcion', 'feedback', 'links', 'asignado'].some(k => (form[k] || '') !== (editingTask[k] || ''))
+    if (isEdit && editingTask.qualityStatus && form.estado === 'completada' && (editingTask.qualityStatus !== 'passed' || changedInputs)) {
+      showToast('La entrega necesita una revisión QA aprobada antes de completarse. Envía los cambios a Correcciones.', 'error'); return
+    }
     setSaving(true)
     try {
       if (isEdit) {
@@ -124,6 +128,7 @@ export default function TaskForm() {
           lastEditedBy: user.email,
           lastEditedAt: serverTimestamp(),
           ...timerUpdates,
+          ...(editingTask.qualityStatus && changedInputs ? { qualityStatus: 'pending' } : {}),
         }
         await updateDoc(doc(db, 'tasks', editingTask.id), updates)
         showToast('Tarea actualizada')
@@ -510,10 +515,13 @@ function AgentResult({ task, showToast }) {
   if (!status && !task.agentOutput) return null
   const info = {
     running: { text: 'El agente está trabajando en esta tarea…', color: 'var(--purple)' },
+    reviewing: { text: 'Un revisor independiente está comprobando la entrega…', color: 'var(--purple)' },
     queued: { text: 'En cola: el agente la tomará en cuanto termine lo que está haciendo', color: 'var(--text-3)' },
     needs_info: { text: 'El agente necesita información para continuar', color: 'var(--warning)' },
     error: { text: 'El agente tuvo un problema con esta tarea', color: 'var(--danger)' },
-    done: { text: 'Entrega lista para tu aprobación', color: 'var(--success)' },
+    done: task.qualityStatus && task.qualityStatus !== 'passed'
+      ? { text: 'Entrega pendiente de resolver la revisión de calidad', color: 'var(--warning)' }
+      : { text: 'Entrega lista para tu aprobación', color: 'var(--success)' },
   }[status] || { text: 'Resultado del agente', color: 'var(--text-2)' }
   const body = status === 'needs_info' ? task.agentQuestion : status === 'error' ? task.agentError : task.agentOutput
   const copy = async () => {
@@ -526,9 +534,23 @@ function AgentResult({ task, showToast }) {
         {body && <button type="button" className="btn btn-secondary btn-sm" onClick={copy}>Copiar</button>}
       </div>
       {body && <pre className="agent-result-body">{body}</pre>}
+      {task.qualityStatus && (
+        <div className="agent-result-hint">
+          <strong>Calidad: {{ pending: 'pendiente', passed: 'aprobada por QA', failed: 'requiere correcciones', blocked: 'revisión bloqueada' }[task.qualityStatus] || task.qualityStatus}</strong>
+          {(task.qualityReviews || []).map((review, index) => (
+            <details key={index}>
+              <summary>{review.reviewerName || review.role || 'Revisión'}: {review.summary}</summary>
+              <pre className="agent-result-body">{[...(review.evidence || []), ...(review.issues || []).map(s => 'Incidencia: ' + s)].join('\n')}</pre>
+            </details>
+          ))}
+          {task.qualityRevision && <p>Revisión: {task.qualityRevision.slice(0, 12)}</p>}
+        </div>
+      )}
       {status === 'done' && (
         <p className="agent-result-hint">
-          Si está bien, muévela a Completada. Si necesita cambios, escribe tus comentarios en Feedback y muévela a Correcciones: el agente la rehace.
+          {task.qualityStatus && task.qualityStatus !== 'passed'
+            ? 'Revisa las incidencias o los datos faltantes, escribe indicaciones en Feedback y envía la tarea a Correcciones. Necesita QA aprobado antes de completarse.'
+            : 'Si está bien, muévela a Completada. Si necesita cambios, escribe tus comentarios en Feedback y muévela a Correcciones: el agente la rehace.'}
         </p>
       )}
       {status === 'needs_info' && (

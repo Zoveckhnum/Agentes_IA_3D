@@ -1,4 +1,4 @@
-// Configuración del negocio. Todo sale de app/.env (lo genera el asistente /instalar).
+// Configuración del negocio. Todo sale de app/.env (npm run setup).
 const env = import.meta.env
 
 export const BRAND = {

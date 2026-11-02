@@ -2,9 +2,20 @@
 // Solo atiende al dueño (TELEGRAM_OWNER_ID); cualquier otra persona recibe un rechazo.
 
 const API = (token, method) => `https://api.telegram.org/bot${token}/${method}`
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+
+export function acceptsMessage(message, ownerId) {
+  return message?.chat?.type === 'private' && !!ownerId && String(message.from?.id) === String(ownerId)
+}
 
 export function startTelegram({ token, ownerId, log, onMessage, onReply, transcribe }) {
+  mkdirSync(new URL('logs/', import.meta.url), { recursive: true })
+  const stateFile = new URL(`logs/telegram-${createHash('sha256').update(token).digest('hex').slice(0, 16)}.json`, import.meta.url)
   let offset = 0
+  if (existsSync(stateFile)) {
+    try { const saved = JSON.parse(readFileSync(stateFile, 'utf8')); if (Number.isSafeInteger(saved.offset) && saved.offset >= 0) offset = saved.offset } catch { log('No se pudo recuperar el cursor de Telegram.') }
+  }
   let stopped = false
 
   const call = async (method, body) => {
@@ -52,8 +63,9 @@ export function startTelegram({ token, ownerId, log, onMessage, onReply, transcr
       try {
         const updates = await call('getUpdates', { offset, timeout: 50, allowed_updates: ['message'] })
         for (const u of updates) {
-          offset = u.update_id + 1
+          try {
           const m = u.message
+          if (m?.chat?.type !== 'private') continue
           const voice = m?.voice || (m?.audio?.mime_type === 'audio/ogg' ? m.audio : null)
           if (!m?.text && !voice) continue
           const fromId = String(m.from?.id)
@@ -62,9 +74,8 @@ export function startTelegram({ token, ownerId, log, onMessage, onReply, transcr
             await send(m.chat.id, `Hola. Tu ID de Telegram es ${fromId}. Aún no estoy vinculado a ningún dueño.`)
             continue
           }
-          if (fromId !== String(ownerId)) {
+          if (!acceptsMessage(m, ownerId)) {
             log(`Telegram: mensaje ignorado de un desconocido (ID ${fromId})`)
-            await send(m.chat.id, 'Lo siento, solo atiendo a mi dueño.')
             continue
           }
           const keepTyping = setInterval(() => typing(m.chat.id), 4500)
@@ -87,12 +98,18 @@ export function startTelegram({ token, ownerId, log, onMessage, onReply, transcr
               const ack = await onReply(replyTo, text)
               if (ack) { await send(m.chat.id, ack); continue }
             }
-            const reply = await onMessage(text)
+            const reply = await onMessage(text, { updateId: u.update_id })
             await send(m.chat.id, reply)
           } catch (e) {
             await send(m.chat.id, 'Tuve un problema: ' + e.message)
           } finally {
             clearInterval(keepTyping)
+          }
+          } finally {
+            offset = u.update_id + 1
+            const temp = new URL(stateFile.href + '.tmp')
+            writeFileSync(temp, JSON.stringify({ offset }))
+            renameSync(temp, stateFile)
           }
         }
       } catch (e) {
