@@ -62,9 +62,9 @@ este filtro no garantiza detectar cualquier secreto. Al alcanzar el límite se
 requiere archivar o retirar documentos; no se descartan preferencias en silencio.
 
 ```powershell
-npm run memoria -- status --root C:\ProgramData\StackBI\AgentMotor\data\memories
-npm run memoria -- put --root C:\ProgramData\StackBI\AgentMotor\data\memories --layer manuales --title "Manual SQL" --file C:\Documentos\manual-revisado.md --source "operador:manual-v1" --project proyecto --client cliente
-npm run memoria -- search --root C:\ProgramData\StackBI\AgentMotor\data\memories --query "conciliar SQL" --project proyecto --client cliente
+node tools/memoria.mjs status --root C:\ProgramData\StackBI\AgentMotor\data\memories
+node tools/memoria.mjs put --root C:\ProgramData\StackBI\AgentMotor\data\memories --layer manuales --title "Manual SQL" --file C:\Documentos\manual-revisado.md --source "operador:manual-v1" --project proyecto --client cliente
+node tools/memoria.mjs search --root C:\ProgramData\StackBI\AgentMotor\data\memories --query "conciliar SQL" --project proyecto --client cliente
 ```
 
 ## Instalación y activación
@@ -106,3 +106,19 @@ Runtime mínimo: Codex/SDK 0.166.0 y MCP SDK 1.32.1; Zod 4.6.7, compatible con e
 peer declarado del SDK y fuera del rango del [aviso de consumo de memoria](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5).
 Se conserva el runner basado en el [SDK oficial de Codex](https://learn.chatgpt.com/docs/codex-sdk);
 la señal de cancelación se comprobó también contra los tipos de la versión fijada.
+
+## Comprobación operativa del 3 de noviembre de 2026
+
+El servicio quedó activo a las 14:42:26 de Ciudad de México. El corte persistido
+es `2026-11-03T20:42:26.2266259Z`: las tareas anteriores se conservaron. La memoria
+de producción comienza vacía; las preferencias y manuales se incorporan mediante
+fuentes revisadas, sin inventar datos del negocio.
+
+El código fue validado con 76 pruebas y 48 verificaciones SQL, y se instaló la API
+desde el ZIP de la [ejecución 41713354652](https://github.com/Zoveckhnum/Agentes_IA_3D/actions/runs/41713354652),
+commit `0c8c4509a7a10dc7a6ce9502789575522c31206e`, SHA-256
+`2e69a02715c7470ed909d1fc91b8bb59fe2d3f6b9edb89b3ab5a36793120dc94`.
+La prueba real del motor bajo su identidad respondió `MEMORIA_OK` desde una
+preferencia sintética en staging, entregó una vez y liberó la asignación. Otra
+tarea anterior al corte permaneció idéntica. Los 24 agentes y diez tareas de
+producción conservaron sus hashes antes/después de instalar y activar.
