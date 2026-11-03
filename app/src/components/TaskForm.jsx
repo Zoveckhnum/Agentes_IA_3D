@@ -532,6 +532,8 @@ function AgentResult({ task, showToast }) {
     reviewing: { text: 'Un revisor independiente está comprobando la entrega…', color: 'var(--purple)' },
     queued: { text: 'En cola: el agente la tomará en cuanto termine lo que está haciendo', color: 'var(--text-3)' },
     needs_info: { text: 'El agente necesita información para continuar', color: 'var(--warning)' },
+    needs_approval: { text: 'Esperando tu aprobación en Telegram', color: 'var(--warning)' },
+    approval_blocked: { text: 'Operación detenida: revisa la autorización', color: 'var(--danger)' },
     error: { text: 'El agente tuvo un problema con esta tarea', color: 'var(--danger)' },
     done: task.qualityReport && task.qualityStatus === 'report'
       ? { text: 'Informe de QA disponible; no aprueba el producto', color: 'var(--info)' }
@@ -539,7 +541,7 @@ function AgentResult({ task, showToast }) {
       ? { text: 'Entrega pendiente de resolver la revisión de calidad', color: 'var(--warning)' }
       : { text: 'Entrega lista para tu aprobación', color: 'var(--success)' },
   }[status] || { text: 'Resultado del agente', color: 'var(--text-2)' }
-  const body = status === 'needs_info' ? task.agentQuestion : status === 'error' ? task.agentError : task.agentOutput
+  const body = status === 'needs_info' ? task.agentQuestion : ['error','approval_blocked'].includes(status) ? task.agentError : task.agentOutput
   const copy = async () => {
     try { await navigator.clipboard.writeText(body || ''); showToast('Copiado') } catch { showToast('No se pudo copiar', 'error') }
   }
@@ -550,6 +552,7 @@ function AgentResult({ task, showToast }) {
         {body && <button type="button" className="btn btn-secondary btn-sm" onClick={copy}>Copiar</button>}
       </div>
       {body && <pre className="agent-result-body">{body}</pre>}
+      {status === 'needs_approval' && <p className="agent-result-hint">Revisa la solicitud en el chat privado del bot. La tarea continuará cuando el ejecutor confirme el resultado de la operación autorizada.</p>}
       {task.projectId && <p className="agent-result-hint">
         Proyecto: {task.projectId}{task.projectBranch ? ` · Rama: ${task.projectBranch}` : ''}
         {task.projectSnapshot ? ` · Archivos revisados: ${task.projectSnapshot.slice(0, 12)}` : ''}

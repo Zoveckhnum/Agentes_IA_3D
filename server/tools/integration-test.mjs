@@ -80,6 +80,10 @@ try {
   check((await call('/api/data/commit', { id: randomUUID(), operations: [{ type: 'update', path: 'tasks/shared', data: { autoLoopOwner: null } }], preconditions: [{ path: 'tasks/shared', expected: { autoLoopOwner: owner } }] }, null, leaseHeaders)).status, 200)
   check((await fetch(config.origin + '/api/worker/capabilities', { headers: leaseHeaders })).status, 200)
   check((await fetch(config.origin + '/api/worker/capabilities', { headers: { Cookie: cookies.owner } })).status, 403)
+  check((await commit([{ type: 'update', path: 'tasks/shared', data: { humanApprovalHistory: [{ status: 'executed' }] } }])).status, 403)
+  check((await commit([{ type: 'update', path: 'tasks/shared', data: { humanApprovalRequests: ['synthetic-request'], agentStatus: 'needs_approval' } }], null, randomUUID(), leaseHeaders)).status, 200)
+  check((await commit([{ type: 'update', path: 'tasks/shared', data: { estado: 'completada' } }])).status, 403)
+  check((await commit([{ type: 'update', path: 'tasks/shared', data: { humanApprovalRequests: [], agentStatus: 'done' } }], null, randomUUID(), leaseHeaders)).status, 200)
   const invitation = await commit([{ type: 'set', path: 'invites/new@test.invalid', data: { role: 'empleado' } }])
   check(invitation.status, 200)
   const token = invitation.json.invitations[0].token

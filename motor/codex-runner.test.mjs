@@ -18,6 +18,20 @@ function fake(events) {
 const message = text => ({ type: 'item.completed', item: { type: 'agent_message', text } })
 const completed = { type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 5 } }
 
+test('el canal humano solo solicita/consulta, vincula la tarea y no pone credenciales en la configuración de Codex', async () => {
+  const id='7f14e12a-9205-4ec7-89a2-b4c7e403f1b0'
+  const event={type:'item.completed',item:{type:'mcp_tool_call',server:'aprobaciones',tool:'solicitar_aprobacion',result:{content:[{type:'text',text:JSON.stringify({requestId:id,status:'pending'})}]}}}
+  const {Client,calls}=fake([event,message('Esperando decisión'),completed])
+  const env={APP_HITL_CREDENTIAL_FILE:'C:\\ProgramData\\StackBI\\AgentMotor\\secrets\\approval-request.p7m',APP_HITL_BOT_TOKEN:'synthetic-bot-secret',APP_HITL_EXECUTE_TOKEN:'synthetic-executor-secret'}
+  const result=await createCodexRunner(env,{CodexClient:Client})('Solicitud','/task',{tools:['aprobaciones_solicitar'],taskId:'task-1'})
+  assert.deepEqual(result.json.approval_requests,[{requestId:id,status:'pending'}])
+  const config=calls.find(c=>c[0]==='client')[1]
+  assert.equal(config.config.mcp_servers.aprobaciones.args.at(-1),'task-1')
+  assert.deepEqual(config.config.mcp_servers.aprobaciones.enabled_tools,['solicitar_aprobacion','estado_aprobacion'])
+  assert.equal(config.config.mcp_servers.proyectos,undefined)
+  assert.doesNotMatch(JSON.stringify(config),/synthetic-bot-secret|synthetic-executor-secret/)
+})
+
 test('una asignación cancelada no inicia una llamada y su señal llega al SDK', async () => {
   const { Client, calls } = fake([message('OK'), completed])
   const run = createCodexRunner({}, { CodexClient: Client })
