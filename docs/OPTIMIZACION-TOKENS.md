@@ -28,6 +28,9 @@ límite de almacenamiento del motor. Cada referencia admite como máximo 1 MiB.
 No se recortan el brief, los comentarios del propietario, los criterios de QA,
 las reglas o los recibos de Telegram. Un prompt completo de más de 96 KiB se bloquea
 antes de llamar a Codex: hay que dividir la tarea sin eliminar requisitos.
+Ese límite mide las reglas, la ficha y el encargo que construye el runner; no incluye
+el historial de un hilo reanudado ni las salidas que las herramientas añadan dentro
+de Codex. El uso real de esas interacciones se recoge al terminar, cuando se reporta.
 
 ## Uso y presupuestos
 
