@@ -17,6 +17,8 @@ Las secciones detalladas y el orden propuesto al final conservan la revisión in
 como historial; sus afirmaciones sobre el motor detenido o la memoria ausente fueron
 superadas por estas implementaciones. Los apartados 5–6 conservan sus brechas generales;
 en SQL y Drive faltan pruebas operativas con cambios concretos revisados y autorizados.
+Se incorporó [optimización de tokens](OPTIMIZACION-TOKENS.md): registro persistente,
+presupuestos de admisión y entregables largos como referencias íntegras por hash.
 
 Esta revisión distingue código existente de capacidades operativas. Las recomendaciones
 son criterios para evaluar; no autorizan por sí mismas despliegues, cambios de esquema,
@@ -30,7 +32,7 @@ mensajes a terceros ni la activación del motor. No se realizaron esas acciones.
 | 2. Aislamiento y CI/CD | Aislamiento implementado; CI/CD parcial | Repositorios en `products/<id>`, ramas `agent/<task_id>`, worktrees, bloqueos locales y archivos de entrega con hashes. Hay despliegue/reversión IIS de esta aplicación, pero no una cadena general de agentes que cree commits atómicos, compile, obtenga aprobación y despliegue cualquier proyecto registrado. |
 | 3. Auto-loop y memoria | Operativo para tareas nuevas; tres capas implementadas | Servicio Windows con identidad propia, corte de activación persistente, asignaciones SQL atómicas, renovación/cancelación, límites y memoria Markdown por cliente/proyecto con índice y respaldo diario. Prueba real: entrega desde memoria y tarea antigua intacta. La memoria de producción comienza vacía; las preferencias/manuales se cargan desde fuentes revisadas. Telegram/chats automáticos y barreras generales siguen separados. |
 | 4. Aprobación humana por Telegram | Operativa para solicitudes y publicación de esta app | Bot privado con botones, propietario/mensaje/nonce vinculados, plan inmutable con hash/destino/vencimiento y consumo único por ejecutor separado. Rechazo real bloqueó el consumo; aprobación real permitió continuar una tarea sintética; otra aprobación publicó el candidato IIS probado. SQL y Drive tienen ejecutores y pruebas de contrato, sin haber aplicado DDL ni subido documentos oficiales como prueba. |
-| 5. Optimización de tokens | Controles básicos; compresión/caché pendientes | Hay límites de tiempo, herramientas, longitud y etapas; se guarda uso de tokens. No se encontró proxy de compresión ni caché semántica. No se han medido ahorros porcentuales. |
+| 5. Optimización de tokens | Medición, presupuestos y contexto bajo demanda implementados | Uso acumulado por tarea/proyecto, reservas persistentes, límites antes de cada llamada y referencias completas por hash para entregables largos. Se mide la caché reportada por Codex. No hay proxy de herramientas ni reutilización semántica de respuestas; faltan mediciones comparables de ahorro real. Los presupuestos bloquean nuevas llamadas, no cortan exactamente una llamada en curso. |
 | 6. Barreras de seguridad | Parcial | Hay validación de rutas y enlaces, filtrado de archivos/credenciales, entorno reducido para Codex, sandbox solicitado, SQL restringido y configuración CMS. No se encontró un ejecutor central con bloqueo explícito de comandos destructivos ni integración de actividad del motor con Windows Event Log. |
 
 ## 1. Roles y habilidades (revisión inicial)
@@ -114,7 +116,7 @@ La publicación autorizada instaló el candidato `e8413af` en producción; se ve
 HTTPS, SQL cifrado con certificado validado y los mismos 24 agentes y diez tareas.
 El manual enlazado documenta alcance, límites y operaciones todavía no ejercitadas.
 
-## 5. Tokens
+## 5. Tokens (revisión inicial)
 
 Evidencia: [codex-runner.mjs](../motor/codex-runner.mjs) y `agentLastUsage` en el worker.
 El límite actual es de 25 minutos por ejecución y existe un límite de llamadas de
@@ -122,6 +124,12 @@ herramientas por rol. Son controles de consumo; no son un límite estricto de to
 ni un presupuesto monetario total. Falta registrar costes por tarea/proyecto,
 establecer presupuestos y medir antes de decidir compresión o caché. Una caché no
 debe reutilizar autorizaciones ni resultados mutables entre clientes o revisiones.
+
+La implementación posterior añade presupuestos diarios y acumulados por tarea,
+incluyendo QA; conserva reservas sin uso reportado y contabiliza los excesos reales.
+Los entregables largos se conservan completos y se consultan bajo demanda. No se
+recortan requisitos ni aprobaciones. El manual enlazado distingue bytes y tokens,
+consumo reportado y reservado, caché del proveedor y respuestas reutilizadas.
 
 ## 6. Seguridad y auditoría
 

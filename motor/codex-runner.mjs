@@ -1,5 +1,5 @@
 import { Codex } from '@openai/codex-sdk'
-import { readFileSync } from 'node:fs'
+import { readFileSync,existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createRoleSkillContext } from './role-skills.mjs'
 import { uuid } from './hitl/core.mjs'
@@ -47,6 +47,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
     const canRegisterProjects = canWriteProjects || tools.includes('proyectos_registro')
     const canReadProjects = canWriteProjects || tools.includes('proyectos_lectura')
     const canRequestApprovals = tools.includes('aprobaciones_solicitar') && !!env.APP_HITL_CREDENTIAL_FILE
+    const canReadReferences=existsSync(join(cwd,'.context'))
     try {
       if (signal?.aborted) return response(true, 'Ejecución cancelada antes de iniciar.')
       const roleContext = createRoleSkillContext(roleId)
@@ -57,7 +58,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
       const codex = new CodexClient({
         ...(env.CODEX_API_KEY || env.OPENAI_API_KEY ? { apiKey: env.CODEX_API_KEY || env.OPENAI_API_KEY } : {}),
         env: codexEnvironment(env, agentName, color),
-        ...(canRegisterProjects || canReadProjects || canRequestApprovals ? {
+        ...(canRegisterProjects || canReadProjects || canRequestApprovals || canReadReferences ? {
           config: { mcp_servers: { ...(canRegisterProjects || canReadProjects ? { proyectos: {
             command: process.execPath,
             args: [fileURLToPath(new URL('proyectos-mcp.mjs', import.meta.url)), cwd, canWriteProjects ? 'write' : canRegisterProjects ? (canReadProjects ? 'register-read' : 'register') : 'read'],
@@ -80,7 +81,12 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
             startup_timeout_sec:20,tool_timeout_sec:30,
             enabled_tools:['solicitar_aprobacion','estado_aprobacion'],
             tools:{solicitar_aprobacion:{approval_mode:'approve'}},
-          }} : {}) } },
+          }} : {}),...(canReadReferences?{contexto:{
+            command:process.execPath,args:[fileURLToPath(new URL('context-mcp.mjs',import.meta.url)),cwd],
+            startup_timeout_sec:20,tool_timeout_sec:20,
+            enabled_tools:['leer_referencia','buscar_referencia'],
+            tools:{leer_referencia:{approval_mode:'approve'},buscar_referencia:{approval_mode:'approve'}},
+          }}:{}) } },
         } : {}),
       })
       const options = {

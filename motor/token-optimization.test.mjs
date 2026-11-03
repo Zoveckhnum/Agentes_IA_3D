@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import {mkdtempSync,readFileSync,writeFileSync,readdirSync,symlinkSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {createTokenMeter,referenceContext,DEFAULT_TOKEN_POLICY,normalizeUsage,validateTokenPolicy} from './token-optimization.mjs'
+import {createTokenMeter,referenceContext,createReferenceReader,DEFAULT_TOKEN_POLICY,normalizeUsage,validateTokenPolicy} from './token-optimization.mjs'
+import {createHash} from 'node:crypto'
 import {createCodexRunner} from './codex-runner.mjs'
 import {reviewDelivery} from './calidad.mjs'
 const directory=()=>mkdtempSync(join(tmpdir(),'stackbi-tokens-'))
@@ -89,4 +90,22 @@ test('QA invalida la revisión si el modelo altera la referencia completa',async
   return {code:0,json:{result:JSON.stringify({verdict:'passed',summary:'Comprobado',evidence:['Lectura'],issues:[]})}}
  }})
  assert.equal(result.qualityStatus,'blocked');assert.match(result.qualityReviews[0].summary,/referencias/)
+})
+test('lector contextual limita ruta, hash, paginación y resultados sin comandos',()=>{
+ const root=directory(),text='a'.repeat(13000)+'CONTROL: TOKENS_OK\n'+'z'.repeat(15000),sha256=createHash('sha256').update(text).digest('hex')
+ referenceContext(root,'Prueba',text);const reader=createReferenceReader(root)
+ const match=reader.search({sha256,query:'CONTROL:'});assert.equal(match.matches.length,1);assert.match(match.matches[0].text,/TOKENS_OK/)
+ const page=reader.read({sha256,offset:13000,maxChars:18});assert.equal(page.text,'CONTROL: TOKENS_OK');assert.equal(page.nextOffset,13018)
+ assert.throws(()=>reader.read({sha256:'../archivo'}),/inválido/)
+ assert.throws(()=>reader.read({sha256,maxChars:12001}),/inválido/)
+ assert.throws(()=>createReferenceReader(directory()).read({sha256}),/ENOENT/)
+ writeFileSync(join(root,'.context',sha256+'.txt'),'alterado');assert.throws(()=>reader.search({sha256,query:'CONTROL:'}),/alterada/)
+})
+test('el runner expone solo las herramientas de referencia de su carpeta',async()=>{
+ const root=directory(),calls=[];referenceContext(root,'Prueba','x'.repeat(13000))
+ class Client{constructor(options){calls.push(options)}startThread(){return this}async runStreamed(){return {events:(async function*(){yield {type:'item.completed',item:{type:'agent_message',text:'ok'}};yield {type:'turn.completed',usage}})()}}}
+ const response=await createCodexRunner({APP_HITL_BOT_TOKEN:'no-debe-pasar'},{CodexClient:Client})('Tarea',root,{tools:[]})
+ assert.equal(response.code,0);const context=calls[0].config.mcp_servers.contexto
+ assert.equal(context.args.at(-1),root);assert.deepEqual(context.enabled_tools,['leer_referencia','buscar_referencia'])
+ assert.doesNotMatch(JSON.stringify(calls),/no-debe-pasar/);assert.equal(context.tools.leer_referencia.approval_mode,'approve')
 })
