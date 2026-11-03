@@ -28,7 +28,7 @@ New-Item -ItemType Directory -Path (Join-Path $root 'data\memories') -Force|Out-
 $environment=Join-Path $root 'secrets\environment.p7m'
 $entry=Join-Path $release 'motor\daemon.mjs'
 $xml=@"
-<service><id>$service</id><name>$service</name><description>StackBI task loop with scoped persistent memory</description><executable>C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</executable><arguments>-NoProfile -NonInteractive -File &quot;$launcher&quot; -EnvironmentFile &quot;$environment&quot; -EntryScript &quot;$entry&quot;</arguments><workingdirectory>$release</workingdirectory><startmode>Automatic</startmode><stoptimeout>40sec</stoptimeout><onfailure action="restart" delay="30sec"/><logpath>$root\logs</logpath><log mode="roll-by-size"><sizeThreshold>10240</sizeThreshold><keepFiles>5</keepFiles></log></service>
+<service><id>$service</id><name>$service</name><description>StackBI task loop with scoped persistent memory</description><executable>C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</executable><arguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$launcher&quot; -EnvironmentFile &quot;$environment&quot; -EntryScript &quot;$entry&quot;</arguments><workingdirectory>$release</workingdirectory><startmode>Automatic</startmode><stoptimeout>40sec</stoptimeout><onfailure action="restart" delay="30sec"/><logpath>$root\logs</logpath><log mode="roll-by-size"><sizeThreshold>10240</sizeThreshold><keepFiles>5</keepFiles></log></service>
 "@
 [IO.File]::WriteAllText((Join-Path $root ('service\'+$service+'.xml')),$xml,(New-Object Text.UTF8Encoding($false)))
 & $exe install|Out-Null;if($LASTEXITCODE){throw 'Fallo de registro'}
