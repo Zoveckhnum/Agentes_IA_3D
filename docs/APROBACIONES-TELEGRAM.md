@@ -108,5 +108,26 @@ conceden al motor permisos para modificarlos. Las herramientas administrativas
 previas siguen existiendo y un administrador puede actuar fuera de este circuito.
 El flujo no completa por sí solo todas las barreras generales del sistema operativo.
 
+## Verificación operativa del 3 de noviembre de 2026
+
+El propietario probó ambos botones en su chat privado. Rechazar dejó la solicitud
+en `rejected` y un intento de consumo devolvió HTTP 409. En otra prueba sin efectos,
+una tarea sintética de staging solicitó el plan por MCP, quedó en `needs_approval`
+con la asignación liberada y continuó únicamente después del recibo `executed`.
+Terminó con `HITL_OK`: una solicitud y dos intentos del modelo, sin repetir la operación.
+
+Una aprobación distinta autorizó publicar el candidato CI `e8413af` (ejecución
+`41721280128`, 90 pruebas unitarias y 52 verificaciones SQL) en `stackbi.com.mx`.
+El ejecutor confirmó la versión `20261103-172325`; la página y `/health/db`
+respondieron HTTP 200 por HTTPS. SQL confirmó cifrado, certificado validado y
+permisos restringidos. Los hashes de los 24 agentes y diez tareas productivas
+coincidieron antes y después. No se aplicaron cambios de esquema ni se publicaron
+documentos oficiales para estas pruebas.
+
+El motor productivo quedó actualizado a `133d9d9`, con credencial solo de solicitud
+y el corte original de tareas nuevas conservado. Se corrigió la actualización del
+XML de su servicio usando los nodos de texto explícitos, y se verificó su arranque.
+El perfil y la política de staging quedaron fuera de la ejecución productiva.
+
 Referencias: [Bot API de Telegram](https://core.telegram.org/bots/api#callbackquery),
 [configuración MCP de Codex](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
