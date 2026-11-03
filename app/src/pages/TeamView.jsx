@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { collection, query, where, onSnapshot } from '../data/firestore.js'
 import { todayKey } from '../utils/worklog.js'
 
 function fmtSeconds(s) {

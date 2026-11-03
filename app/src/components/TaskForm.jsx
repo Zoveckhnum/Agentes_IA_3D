@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { doc, addDoc, updateDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { doc, addDoc, updateDoc, collection, serverTimestamp } from '../data/firestore.js'
 import { logWork } from '../utils/worklog.js'
 import { sendTaskAssignedEmail } from '../utils/emailNotify.js'
 import Icon from './Icons.jsx'
@@ -16,6 +16,7 @@ export default function TaskForm() {
     descripcion: '',
     asignado: user.uid,
     cliente: '',
+    projectId: '',
     prioridad: 'media',
     estado: 'pendiente',
     fechaRequerimiento: '',
@@ -37,6 +38,7 @@ export default function TaskForm() {
         descripcion: editingTask.descripcion || '',
         asignado: editingTask.asignado || user.uid,
         cliente: editingTask.cliente || '',
+        projectId: editingTask.projectId || '',
         prioridad: editingTask.prioridad || 'media',
         estado: editingTask.estado || 'pendiente',
         fechaRequerimiento: editingTask.fechaRequerimiento
@@ -109,8 +111,11 @@ export default function TaskForm() {
 
   const handleSave = async () => {
     if (!form.tarea.trim()) { showToast('Ingresa el nombre de la tarea', 'error'); return }
-    const changedInputs = isEdit && ['tarea', 'descripcion', 'feedback', 'links', 'asignado'].some(k => (form[k] || '') !== (editingTask[k] || ''))
-    if (isEdit && editingTask.qualityStatus && form.estado === 'completada' && (editingTask.qualityStatus !== 'passed' || changedInputs)) {
+    if (form.projectId && !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(form.projectId)) { showToast('El ID del proyecto debe usar minúsculas, números, guiones o guiones bajos.', 'error'); return }
+    const qualityReady = editingTask?.qualityStatus === 'passed' || (editingTask?.qualityReport === true && editingTask?.qualityStatus === 'report')
+    if (form.projectId && form.estado === 'completada' && (!isEdit || !qualityReady)) { showToast('El proyecto necesita una entrega revisada por QA antes de completarse.', 'error'); return }
+    const changedInputs = isEdit && ['tarea', 'descripcion', 'feedback', 'links', 'asignado', 'projectId'].some(k => (form[k] || '') !== (editingTask[k] || ''))
+    if (isEdit && editingTask.qualityStatus && form.estado === 'completada' && (!qualityReady || changedInputs)) {
       showToast('La entrega necesita una revisión QA aprobada antes de completarse. Envía los cambios a Correcciones.', 'error'); return
     }
     setSaving(true)
@@ -280,6 +285,15 @@ export default function TaskForm() {
             </div>
 
             {/* Link de la tarea terminada */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="task-project">Proyecto del repositorio (opcional)</label>
+              <input id="task-project" className="form-input" value={form.projectId}
+                onChange={e => setField('projectId', e.target.value.trim())}
+                placeholder="ID registrado, por ejemplo: demo" autoCapitalize="none" spellCheck={false}
+                aria-describedby="task-project-help" maxLength={64} />
+              <p id="task-project-help" style={{ fontSize: 13 }}>Indica el ID registrado para que el agente trabaje en ese proyecto. Vacío usa la carpeta habitual de la tarea.</p>
+            </div>
+
             <div className="form-group">
               <label className="form-label">Link de la tarea terminada</label>
               <input
@@ -519,7 +533,9 @@ function AgentResult({ task, showToast }) {
     queued: { text: 'En cola: el agente la tomará en cuanto termine lo que está haciendo', color: 'var(--text-3)' },
     needs_info: { text: 'El agente necesita información para continuar', color: 'var(--warning)' },
     error: { text: 'El agente tuvo un problema con esta tarea', color: 'var(--danger)' },
-    done: task.qualityStatus && task.qualityStatus !== 'passed'
+    done: task.qualityReport && task.qualityStatus === 'report'
+      ? { text: 'Informe de QA disponible; no aprueba el producto', color: 'var(--info)' }
+      : task.qualityStatus && task.qualityStatus !== 'passed'
       ? { text: 'Entrega pendiente de resolver la revisión de calidad', color: 'var(--warning)' }
       : { text: 'Entrega lista para tu aprobación', color: 'var(--success)' },
   }[status] || { text: 'Resultado del agente', color: 'var(--text-2)' }
@@ -534,9 +550,13 @@ function AgentResult({ task, showToast }) {
         {body && <button type="button" className="btn btn-secondary btn-sm" onClick={copy}>Copiar</button>}
       </div>
       {body && <pre className="agent-result-body">{body}</pre>}
+      {task.projectId && <p className="agent-result-hint">
+        Proyecto: {task.projectId}{task.projectBranch ? ` · Rama: ${task.projectBranch}` : ''}
+        {task.projectSnapshot ? ` · Archivos revisados: ${task.projectSnapshot.slice(0, 12)}` : ''}
+      </p>}
       {task.qualityStatus && (
         <div className="agent-result-hint">
-          <strong>Calidad: {{ pending: 'pendiente', passed: 'aprobada por QA', failed: 'requiere correcciones', blocked: 'revisión bloqueada' }[task.qualityStatus] || task.qualityStatus}</strong>
+          <strong>Calidad: {{ pending: 'pendiente', passed: 'aprobada por QA', failed: 'requiere correcciones', blocked: 'revisión bloqueada', report: 'informe emitido; no aprueba el producto' }[task.qualityStatus] || task.qualityStatus}</strong>
           {(task.qualityReviews || []).map((review, index) => (
             <details key={index}>
               <summary>{review.reviewerName || review.role || 'Revisión'}: {review.summary}</summary>
@@ -548,7 +568,9 @@ function AgentResult({ task, showToast }) {
       )}
       {status === 'done' && (
         <p className="agent-result-hint">
-          {task.qualityStatus && task.qualityStatus !== 'passed'
+          {task.qualityReport && task.qualityStatus === 'report'
+            ? 'Este informe sirve como insumo para las siguientes tareas. Completarlo no aprueba el producto; la implementación necesitará una revisión independiente.'
+            : task.qualityStatus && task.qualityStatus !== 'passed'
             ? 'Revisa las incidencias o los datos faltantes, escribe indicaciones en Feedback y envía la tarea a Correcciones. Necesita QA aprobado antes de completarse.'
             : 'Si está bien, muévela a Completada. Si necesita cambios, escribe tus comentarios en Feedback y muévela a Correcciones: el agente la rehace.'}
         </p>

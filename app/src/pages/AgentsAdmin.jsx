@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { doc, updateDoc, deleteDoc } from '../data/firestore.js'
 import Icon from '../components/Icons.jsx'
 import AgentModal, { AgentAvatar } from '../components/AgentModal.jsx'
 

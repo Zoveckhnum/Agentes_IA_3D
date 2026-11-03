@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp, Timestamp, onSnapshot } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp, Timestamp, onSnapshot } from '../data/firestore.js'
 import { OfficeScene } from '../office/scene.js'
 import Icon from '../components/Icons.jsx'
 import AgentModal, { AgentAvatar } from '../components/AgentModal.jsx'

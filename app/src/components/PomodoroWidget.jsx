@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, onSnapshot } from '../data/firestore.js'
 import Icon from './Icons.jsx'
 
 const STORAGE_KEY = 'aia3d_pomodoro_v2'

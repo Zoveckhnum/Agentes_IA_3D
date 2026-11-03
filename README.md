@@ -8,6 +8,10 @@ Los agentes usan **OpenAI Codex** y necesitan conexión a OpenAI. No requiere Cl
 
 ## Arranque local
 
+Para la variante preparada con **SQL Server local, API Node e IIS**, consulta
+[Operación SQL local](docs/SQL-LOCAL.md). Está aislada en la rama `feat/sql-local`;
+el arranque con emuladores descrito a continuación corresponde al modo original.
+
 Requisitos: **Node.js 22+**, **Java 21+** y acceso a Codex mediante tu cuenta de ChatGPT o una API key.
 Los límites y el costo dependen de tu cuenta; el proyecto tiene licencia MIT.
 
@@ -31,7 +35,9 @@ powershell -ExecutionPolicy Bypass -File tools/java-local.ps1
 El script descarga el JRE 21 de Eclipse Temurin, verifica su SHA-256 y lo extrae en `.local/java/`.
 En macOS/Linux instala Java 21+ y asegúrate de que `java -version` funcione.
 
-Abre **http://127.0.0.1:5173** y pulsa **Entrar a mi oficina local**.
+Abre **http://127.0.0.1:5173** e inicia sesión con correo y contraseña.
+El formulario incluye un desplegable **Credenciales de demostración** con la cuenta local.
+La sesión dura hasta cerrar la pestaña, salvo que marques **Mantener sesión en este navegador**.
 Firebase se puede inspeccionar en **http://127.0.0.1:4000**.
 La primera ejecución descarga los emuladores. Todos los servicios escuchan en loopback.
 Puertos: web 5173, Authentication 9099, Firestore 8080, panel 4000, hub 4400, logs 4500 y websocket 9150.
@@ -44,7 +50,8 @@ con contraseña de prueba `solo-emulador-local`. Se usan exclusivamente en los e
 
 Detén con **Ctrl+C** para exportar los datos a `.local/data/`. Se importan en el próximo arranque.
 Cerrar a la fuerza la terminal puede impedir la exportación. `.local/`, las credenciales, los trabajos
-y las entregas están excluidos de Git. El sembrado no reemplaza agentes existentes ni duplica el equipo.
+y las entregas están excluidos de Git. El sembrado conserva el nombre y los datos del perfil,
+no reemplaza agentes existentes ni duplica el equipo.
 
 ## Configurar Codex y el negocio
 
@@ -110,9 +117,12 @@ Las herramientas de video y voz pueden descargar modelos al usarse por primera v
 | `npm run integraciones:check` | Diagnóstico de GitHub, Telegram y Drive |
 | `npm run drive:login` | Autoriza el Drive personal desde el navegador local |
 | `npm run proyecto -- id propietario/repo Nombre` | Registra un repositorio por proyecto |
+| `npm run proyecto:preparar -- id tarea_id` | Prepara un repositorio local separado y una rama de tarea |
 | `npm run test:reglas` | Prueba permisos y controles QA contra los emuladores activos |
 
 Si falla el acceso local, revisa que los emuladores están activos y ejecuta `npm run seed`.
+La [guía de aislamiento](docs/AISLAMIENTO.md) describe la preparación local en `products/`, sus controles y cómo conectar tareas al worker usando el campo Proyecto del repositorio.
+También puedes pedir al coordinador que registre un proyecto indicando su ID y repositorio GitHub; el registro es local y no crea ni clona el repositorio remoto.
 Si Codex devuelve 401 o no tiene sesión, ejecuta `npm run codex -- login`.
 Si hay un puerto ocupado, detén la instancia anterior antes de iniciar otra.
 El indicador “Motor conectado” confirma Firebase; `check:codex` verifica OpenAI por separado.

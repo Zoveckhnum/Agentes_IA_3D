@@ -14,6 +14,11 @@ test('la etapa siguiente espera una entrega válida y nunca adelanta QA pendient
   assert.equal(dependencyReady({ ...t, estado: 'en_revision', qualityStatus: 'passed' }), false)
   assert.equal(dependencyReady({ ...t, agentStatus: 'error' }), false)
   assert.equal(dependencyReady(undefined), false)
+  const report = { ...t, qualityStatus: 'report', qualityReport: true }
+  assert.equal(dependencyReady(report), true)
+  assert.equal(dependencyReady(report, true), false)
+  assert.equal(dependencyReady({ ...report, qualityReport: false }), false)
+  assert.equal(dependencyReady({ ...report, qualityStatus: 'blocked' }), false)
 })
 
 test('delegar conserva el objetivo y crea una continuación persistente, idempotente y limitada', () => {

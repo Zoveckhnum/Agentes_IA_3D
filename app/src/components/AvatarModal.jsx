@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { db } from '../firebase.js'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc } from '../data/firestore.js'
 import Icon from './Icons.jsx'
 import LookEditor, { userLook } from './LookEditor.jsx'
 

@@ -38,11 +38,15 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/agents/$(data.asignado));
     }
     function changedInputs() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['tarea', 'descripcion', 'feedback', 'links', 'asignado']);
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['tarea', 'descripcion', 'feedback', 'links', 'asignado', 'projectId']);
+    }
+    function completedQuality(data) {
+      return data.get('qualityStatus', '') == 'passed'
+        || (data.get('qualityReport', false) == true && data.get('qualityStatus', '') == 'report');
     }
     function validQualityUpdate() {
       return isAgentBot() || (
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'agentOutput'])
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead'])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['qualityStatus']) || request.resource.data.qualityStatus == 'pending')
         && (!('qualityStatus' in resource.data) || !changedInputs() || request.resource.data.qualityStatus == 'pending')
       );
@@ -69,9 +73,12 @@ service cloud.firestore {
     match /tasks/{taskId} {
       allow read: if isActiveUser() || isAgentBot();
       // El coordinador (vía el robot) solo puede crear tareas asignadas a agentes
-      allow create: if isActiveUser() || (isAgentBot() && isAgentTask(request.resource.data));
+      allow create: if (isActiveUser() || (isAgentBot() && isAgentTask(request.resource.data)))
+        && (request.resource.data.get('projectId', '') == '' || request.resource.data.estado != 'completada')
+        && !request.resource.data.keys().hasAny(['projectSnapshot', 'projectBranch', 'projectHead', 'qualityReport']);
       allow update: if isAuth()
-        && (!('qualityStatus' in resource.data) || request.resource.data.estado != 'completada' || (resource.data.qualityStatus == 'passed' && request.resource.data.qualityStatus == 'passed' && !changedInputs()))
+        && (request.resource.data.get('projectId', '') == '' || request.resource.data.estado != 'completada' || completedQuality(request.resource.data))
+        && (!('qualityStatus' in resource.data) || request.resource.data.estado != 'completada' || (completedQuality(resource.data) && completedQuality(request.resource.data) && !changedInputs()))
         && validQualityUpdate()
         && (
         isAdmin() ||

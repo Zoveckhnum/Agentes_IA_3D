@@ -2,8 +2,9 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync } from
 import { createServer } from 'node:http'
 import { randomBytes, createHash } from 'node:crypto'
 import { once } from 'node:events'
-import { api, credentialsDir, projects, projectsFile, githubClient, driveToken, driveClient } from './integraciones.mjs'
+import { api, credentialsDir, projects, githubClient, driveToken, driveClient } from './integraciones.mjs'
 import { loadMotorEnv } from './env.mjs'
+import { registerProject } from './registro-proyectos.mjs'
 
 mkdirSync(credentialsDir, { recursive: true })
 const integrations = new URL('integraciones.env', import.meta.url)
@@ -80,10 +81,7 @@ try {
   else if (command === 'proyecto') {
     const [id, repo, ...name] = process.argv.slice(3)
     if (!id || !repo || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(id) || (repo !== '-' && !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo))) throw new Error('Uso: npm run proyecto -- id propietario/repositorio Nombre del proyecto. Usa - para solo Drive.')
-    const all = projects()
-    if (all[id] && all[id].github !== (repo === '-' ? '' : repo)) throw new Error('El ID ya tiene otro destino. Usa otro ID para conservar su historial.')
-    all[id] = { ...all[id], nombre: name.join(' ') || id, github: repo === '-' ? '' : repo }
-    writeFileSync(projectsFile, JSON.stringify(all, null, 2) + '\n')
+    registerProject({ id, github: repo === '-' ? '' : repo, nombre: name.join(' ') })
     console.log(`Proyecto ${id} registrado. No se ha creado ni modificado ningún repositorio remoto.`)
   } else throw new Error('Comandos: check, drive-login, proyecto.')
 } catch (error) { console.error(error.message); process.exitCode = 1 }

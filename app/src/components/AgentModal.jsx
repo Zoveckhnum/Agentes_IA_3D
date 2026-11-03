@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { db } from '../firebase.js'
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from '../data/firestore.js'
 import Icon from './Icons.jsx'
 import LookEditor, { DEFAULT_LOOK } from './LookEditor.jsx'
 import CATALOGO from '../../../roles/catalogo.json'

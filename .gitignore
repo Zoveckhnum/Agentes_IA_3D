@@ -1,6 +1,12 @@
 # Dependencias y builds
 node_modules/
 app/dist/
+deploy/sql-preview/
+server/.test-artifacts/
+*.bak
+*.mdf
+*.ldf
+*.p7m
 *.zip
 
 # Secretos y configuración de cada negocio (nunca se suben)
@@ -12,6 +18,7 @@ motor/media-config.json
 .firebaserc
 
 # Datos de trabajo del motor
+products/
 motor/logs/
 motor/trabajos/
 motor/entregas/
@@ -26,9 +33,12 @@ instalacion.json
 motor/integraciones.env
 motor/credenciales/
 motor/proyectos.json
+motor/proyectos.json.*.tmp
+motor/proyectos.json.lock
 instalacion.nube.json
 
 # Sistema
 .DS_Store
 Thumbs.db
 *.log
+/.local-tests-result.log

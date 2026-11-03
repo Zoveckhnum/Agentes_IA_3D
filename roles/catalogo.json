@@ -4,6 +4,7 @@
   "herramientas": {
     "proyectos": ["proyectos_integracion"],
     "proyectos_lectura": ["proyectos_lectura"],
+    "proyectos_registro": ["proyectos_registro"],
     "web": ["web_search"],
     "archivos": ["file_read"],
     "skills": ["skills"],
@@ -232,7 +233,7 @@
       "nombre": "Asistente personal y coordinador",
       "descripcion": "Habla contigo por Telegram, revisa tu correo y calendario, y reparte tareas entre los demás agentes.",
       "mision": "Asistente personal del dueño del negocio. Revisa correo y calendario, resume lo importante, deja borradores de respuesta y organiza al equipo: recibe pedidos y los reparte entre los agentes según su especialidad. Nunca envía correos ni publica nada.",
-      "herramientas": ["web", "archivos", "skills", "drive_lectura", "gmail", "calendario"],
+      "herramientas": ["web", "archivos", "skills", "drive_lectura", "gmail", "calendario", "proyectos_registro"],
       "coordinador": true,
       "conectores": ["Gmail (opcional)", "Google Calendar (opcional)", "Telegram (opcional)"]
     },

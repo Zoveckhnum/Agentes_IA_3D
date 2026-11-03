@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, updateDoc, deleteDoc, serverTimestamp } from '../data/firestore.js'
 import { logWork } from '../utils/worklog.js'
 import { dueInfo, duplicateTask, wipLimitReached, WIP_LIMIT } from './KanbanView.jsx'
 import Icon from '../components/Icons.jsx'

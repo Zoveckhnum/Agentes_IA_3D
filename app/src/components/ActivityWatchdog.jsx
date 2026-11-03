@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, updateDoc, serverTimestamp } from '../data/firestore.js'
 import { logWork } from '../utils/worklog.js'
 import Icon from './Icons.jsx'
 

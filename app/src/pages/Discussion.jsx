@@ -4,7 +4,7 @@ import { db } from '../firebase.js'
 import {
   collection, addDoc, deleteDoc, doc, updateDoc,
   onSnapshot, orderBy, query, serverTimestamp, arrayUnion, arrayRemove
-} from 'firebase/firestore'
+} from '../data/firestore.js'
 
 function timeAgo(ts) {
   if (!ts) return ''

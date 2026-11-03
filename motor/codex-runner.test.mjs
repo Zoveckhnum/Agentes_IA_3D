@@ -18,17 +18,22 @@ function fake(events) {
 const message = text => ({ type: 'item.completed', item: { type: 'agent_message', text } })
 const completed = { type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 5 } }
 
-test('permiso persistente limitado a borradores, solo para roles de escritura', async () => {
+test('registro local y consentimiento para borradores respetan los permisos del rol', async () => {
   for (const granted of [false, true]) {
-    for (const capability of ['proyectos_integracion', 'proyectos_lectura']) {
+    for (const capability of ['proyectos_integracion', 'proyectos_lectura', 'proyectos_registro']) {
       const { Client, calls } = fake([message('listo'), completed])
       await createCodexRunner({ PROJECTS_ALLOW_DRAFT_WRITES: String(granted) }, { CodexClient: Client })('tarea', '/trabajo', { tools: [capability] })
       const config = calls[0][1].config.mcp_servers.proyectos
       const canWrite = capability === 'proyectos_integracion'
-      assert.deepEqual(config.enabled_tools, ['listar_proyectos', 'github_leer', 'drive_listar', ...(canWrite ? ['github_borrador', 'drive_guardar'] : [])])
-      assert.deepEqual(config.tools || {}, granted && canWrite ? {
-        github_borrador: { approval_mode: 'approve' },
-        drive_guardar: { approval_mode: 'approve' },
+      const canRegister = canWrite || capability === 'proyectos_registro'
+      assert.equal(config.args.at(-1), canWrite ? 'write' : canRegister ? 'register' : 'read')
+      assert.deepEqual(config.enabled_tools, ['listar_proyectos', ...(capability !== 'proyectos_registro' ? ['github_leer', 'drive_listar'] : []), ...(canRegister ? ['registrar_proyecto'] : []), ...(canWrite ? ['github_borrador', 'drive_guardar'] : [])])
+      assert.deepEqual(config.tools || {}, canRegister ? {
+        registrar_proyecto: { approval_mode: 'approve' },
+        ...(granted && canWrite ? {
+          github_borrador: { approval_mode: 'approve' },
+          drive_guardar: { approval_mode: 'approve' },
+        } : {}),
       } : {})
       assert.equal(config.default_tools_approval_mode, undefined)
       assert.equal(calls[1][1].approvalPolicy, 'never')

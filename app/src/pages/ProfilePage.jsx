@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc } from '../data/firestore.js'
 
 function fmtDate(ts) {
   if (!ts) return '—'

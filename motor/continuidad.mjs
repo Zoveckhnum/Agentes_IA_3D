@@ -2,14 +2,16 @@ import { mkdirSync, writeFileSync, lstatSync, rmSync } from 'node:fs'
 import { join, dirname, resolve, relative, isAbsolute } from 'node:path'
 import { createHash } from 'node:crypto'
 import { snapshotFiles } from './calidad.mjs'
+import { taskInputDirectory } from './tareas-proyecto.mjs'
 
 export function dependencyReady(task, requiresQA = false) {
   return !!task && ['completada', 'en_espera'].includes(task.estado)
     && task.agentStatus === 'done' && !task.pendingAcceptance
-    && (!(requiresQA || task.qualityStatus) || task.qualityStatus === 'passed')
+    && (!(requiresQA || task.qualityStatus) || task.qualityStatus === 'passed'
+      || (!requiresQA && task.qualityReport === true && task.qualityStatus === 'report'))
 }
 
-export function continuation(origin, ids, { request, inputs = [], depth = 0 }, coordinatorId) {
+export function continuation(origin, ids, { request, inputs = [], depth = 0, projectId = '' }, coordinatorId) {
   if (depth >= 8) throw new Error('Se alcanzó el límite de 8 etapas. Revisa el alcance antes de continuar.')
   const inputTaskIds = [...new Set([...inputs, ...ids])]
   if (!request || !ids.length || inputTaskIds.length > 60) throw new Error('Continuación sin objetivo o con demasiados insumos.')
@@ -19,6 +21,7 @@ export function continuation(origin, ids, { request, inputs = [], depth = 0 }, c
     descripcion: `Retoma la solicitud original hasta entregar todos sus resultados:\n${request}\n\nLee insumos/ y su evidencia de revisión. Si falta implementación o pruebas, delega la siguiente etapa concreta. Si el producto está listo y pasó QA, reúne los archivos revisados sin modificarlos y guárdalos en los destinos solicitados. Entrega enlaces reales y el resultado de QA. Un plan o una lista de pruebas no son una implementación ni pruebas ejecutadas. No declares completado el proyecto si falta un entregable.`,
     coordinationRequest: request,
     coordinationDepth: depth + 1,
+    projectId,
     inputTaskIds,
     dependsOn: inputTaskIds,
     asignado: coordinatorId,
@@ -50,14 +53,14 @@ export function stageInputs(root, ids, cwd, tasks) {
   let count = 0, bytes = 0
   for (const id of [...new Set(ids)]) {
     if (!/^[\w-]+$/.test(id) || !tasks.has(id) || resolve(root, id) === resolve(cwd)) throw new Error('Insumo de tarea inválido.')
-    const source = join(root, id)
-    if (lstatSync(source).isSymbolicLink()) throw new Error('Insumo de tarea inválido: enlace simbólico.')
     const task = tasks.get(id)
-    const files = snapshotFiles(source, new Set(['insumos']))
+    const source = taskInputDirectory(root, id, task)
+    if (lstatSync(source).isSymbolicLink()) throw new Error('Insumo de tarea inválido: enlace simbólico.')
+    const files = snapshotFiles(source, task.projectSnapshot ? new Set() : new Set(['insumos']))
     const manifest = new Map((task.qualityManifest || []).map(f => [f.path, f.hash]))
     // Las revisiones de insumos anteriores están en sus propios orígenes.
-    const reviewed = [...manifest].filter(([path]) => !path.startsWith('insumos/'))
-    if (task.qualityStatus === 'passed' && manifest.size &&
+    const reviewed = [...manifest].filter(([path]) => task.projectSnapshot || !path.startsWith('insumos/'))
+    if (['passed', 'report'].includes(task.qualityStatus) && manifest.size &&
         (reviewed.length !== files.length || files.some(f => manifest.get(f.path) !== f.hash))) {
       throw new Error(`La entrega ${id} cambió después de QA; requiere revisión.`)
     }

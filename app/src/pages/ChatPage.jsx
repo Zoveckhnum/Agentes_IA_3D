@@ -4,7 +4,7 @@ import { db } from '../firebase.js'
 import {
   collection, doc, addDoc, setDoc, onSnapshot,
   query, orderBy, serverTimestamp, limit
-} from 'firebase/firestore'
+} from '../data/firestore.js'
 
 // Id determinístico del chat entre dos usuarios
 function chatIdFor(uidA, uidB) {

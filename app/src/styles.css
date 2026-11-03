@@ -765,6 +765,17 @@ tbody td { padding: 12px 14px; font-size: 13.5px; color: var(--text); vertical-a
   transition: all var(--transition);
 }
 .google-btn:hover { border-color: var(--purple); background: var(--purple-light); color: var(--purple); transform: translateY(-1px); }
+.login-form { text-align: left; }
+.login-form .form-group { margin-bottom: 16px; }
+.login-form .form-input { font-size: 16px; }
+.login-remember { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-2); margin-bottom: 20px; }
+.login-remember input { accent-color: var(--purple); }
+.login-error { color: var(--danger); font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+[data-theme="light"] .login-error { color: #b91c1c; }
+.login-form .google-btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
+.login-demo { text-align: left; margin-top: 20px; font-size: 14px; color: var(--text-2); overflow-wrap: anywhere; }
+.login-demo summary { cursor: pointer; }
+.login-demo p { margin-top: 10px; line-height: 1.5; }
 
 /* ---- Toast ---- */
 .toast {

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { auth, db, googleProvider, useEmulators } from './firebase.js'
-import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut } from 'firebase/auth'
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, onSnapshot, orderBy, query, getDocs } from 'firebase/firestore'
+import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOut, setPersistence, browserSessionPersistence, browserLocalPersistence } from './data/auth.js'
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, onSnapshot, orderBy, query, getDocs } from './data/firestore.js'
+import { useLocalSql } from './data/mode.js'
+import PasswordChangePage from './pages/PasswordChangePage.jsx'
 
 import LoginPage from './pages/LoginPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -19,6 +21,7 @@ import ActivityWatchdog from './components/ActivityWatchdog.jsx'
 import Tutorial from './components/Tutorial.jsx'
 import TaskForm from './components/TaskForm.jsx'
 import { logOnline } from './utils/worklog.js'
+import { isReadyProfile } from './utils/profile.js'
 
 // La oficina 3D carga Three.js: se descarga solo al abrir esa pestaña
 const OfficeView = React.lazy(() => import('./pages/OfficeView.jsx'))
@@ -67,6 +70,7 @@ export default function App() {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
         setUser(u)
+        if (u.mustChangePassword) { setUserProfile(null); setLoading(false); return }
         await loadOrCreateProfile(u)
         const seen = localStorage.getItem(`tutorial_${u.uid}`)
         if (!seen) setShowTutorial(true)
@@ -89,9 +93,11 @@ export default function App() {
 
   // Real-time listeners
   useEffect(() => {
-    if (!user) return
+    if (!user || !isReadyProfile(userProfile, user.uid)) return
     const unsubMyProfile = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-      if (snap.exists()) setUserProfile({ uid: user.uid, ...snap.data() })
+      const profile = snap.exists() ? { ...snap.data(), uid: user.uid } : null
+      // Un snapshot parcial de presencia no reemplaza la identidad ya cargada.
+      if (isReadyProfile(profile, user.uid)) setUserProfile(profile)
     })
     if (!['admin', 'empleado'].includes(userProfile?.role)) {
       setTasks([]); setUsers([]); setAgents([])
@@ -113,12 +119,12 @@ export default function App() {
       (snap) => setAgents(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       (err) => console.warn('agents:', err.code))
     return () => { unsubTasks(); unsubUsers(); unsubClients(); unsubMyProfile(); unsubAgents() }
-  }, [user, userProfile?.role])
+  }, [user, userProfile?.role, userProfile?.email])
 
   // Presencia + tiempo de conexión. Corre SOLO cuando el perfil ya existe,
   // para no crear docs fantasma (sin email/rol) antes que loadOrCreateProfile.
   useEffect(() => {
-    if (!user || !userProfile) return
+    if (!user || !isReadyProfile(userProfile, user.uid)) return
     const isActive = userProfile.role === 'admin' || userProfile.role === 'empleado'
     const updatePresence = () => {
       setDoc(doc(db, 'users', user.uid), { lastSeen: serverTimestamp() }, { merge: true })
@@ -129,7 +135,7 @@ export default function App() {
       if (isActive) logOnline(user.uid, 60) // 1 min conectado
     }, 60000)
     return () => clearInterval(presenceInterval)
-  }, [user, userProfile?.role])
+  }, [user, userProfile?.role, userProfile?.email])
 
   const loadOrCreateProfile = async (u) => {
     const ref = doc(db, 'users', u.uid)
@@ -222,13 +228,25 @@ export default function App() {
     } catch (e) { /* notificación no soportada en este dispositivo */ }
   }
 
-  const handleLogin = async () => {
+  const handleLogin = async (credentials) => {
     try {
-      if (useEmulators) await signInWithEmailAndPassword(auth, 'admin@oficina.local', 'solo-emulador-local')
+      if (useEmulators || useLocalSql) {
+        await setPersistence(auth, credentials.remember ? browserLocalPersistence : browserSessionPersistence)
+        await signInWithEmailAndPassword(auth, credentials.email.trim(), credentials.password)
+      }
       else await signInWithPopup(auth, googleProvider)
       requestNotifPermission()
     } catch (e) {
-      showToast('Error al iniciar sesión', 'error')
+      const message = {
+        'auth/invalid-credential': 'El correo o la contraseña no son correctos.',
+        'auth/user-not-found': 'El correo o la contraseña no son correctos.',
+        'auth/wrong-password': 'El correo o la contraseña no son correctos.',
+        'auth/invalid-email': 'Introduce un correo válido.',
+        'auth/too-many-requests': 'Demasiados intentos. Espera un momento y vuelve a intentarlo.',
+        'auth/network-request-failed': 'No se pudo conectar. Comprueba que la oficina local esté encendida y vuelve a intentarlo.',
+        'auth/popup-closed-by-user': 'Se cerró la ventana de acceso. Puedes volver a intentarlo.',
+      }[e.code] || 'No se pudo iniciar sesión. Vuelve a intentarlo.'
+      throw new Error(message)
     }
   }
 
@@ -237,6 +255,8 @@ export default function App() {
     setPage(null)
     setTasks([])
     setUsers([])
+    setAgents([])
+    setShowTutorial(false)
     setViewAsEmployee(false)
   }
 
@@ -244,7 +264,9 @@ export default function App() {
   const openNewTask = () => { setEditingTask(null); setTaskFormOpen(true) }
   const closeTaskForm = () => { setTaskFormOpen(false); setEditingTask(null) }
 
-  if (loading || (user && userProfile && page === null)) {
+  if (useLocalSql && user?.mustChangePassword) return <PasswordChangePage onLogout={handleLogout} />
+
+  if (loading || (user && (!isReadyProfile(userProfile, user.uid) || page === null))) {
     return (
       <div className="loading-screen">
         <div style={{ textAlign: 'center' }}>

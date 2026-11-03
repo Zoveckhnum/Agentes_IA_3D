@@ -1,6 +1,6 @@
 import { BRAND } from '../config.js'
 import { db } from '../firebase.js'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc } from '../data/firestore.js'
 
 // Config de EmailJS guardada en Firestore: config/emailjs
 // { serviceId, templateId, publicKey }

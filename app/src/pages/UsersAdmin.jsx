@@ -1,8 +1,9 @@
 import React, { useState } from 'react'
 import { BRAND } from '../config.js'
 import { useApp, SUPER_ADMIN_EMAIL } from '../App.jsx'
+import { useLocalSql } from '../data/mode.js'
 import { db } from '../firebase.js'
-import { doc, updateDoc, deleteDoc, setDoc, getDocs, collection, writeBatch, onSnapshot } from 'firebase/firestore'
+import { doc, updateDoc, deleteDoc, setDoc, getDocs, collection, writeBatch, onSnapshot } from '../data/firestore.js'
 import { useEffect } from 'react'
 
 export default function UsersAdmin() {
@@ -358,6 +359,7 @@ function InviteModal({ onClose, showToast, isSuperAdmin }) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('empleado')
   const [saving, setSaving] = useState(false)
+  const [invitationUrl, setInvitationUrl] = useState('')
 
   const handleInvite = async () => {
     const clean = email.trim().toLowerCase()
@@ -365,10 +367,19 @@ function InviteModal({ onClose, showToast, isSuperAdmin }) {
     setSaving(true)
     try {
       // Registrar la invitación: al registrarse con este correo, entra directo con el rol asignado
-      await setDoc(doc(db, 'invites', clean), {
+      const result = await setDoc(doc(db, 'invites', clean), {
         role,
         invitedAt: new Date().toISOString(),
       })
+      if (useLocalSql) {
+        const invitation = result?.invitations?.find(item => item.email === clean)
+        if (!invitation) throw new Error('No se generó el enlace de invitación')
+        const url = new URL(window.location.origin)
+        url.hash = new URLSearchParams({ invite: invitation.token, email: clean }).toString()
+        setInvitationUrl(url.toString())
+        showToast('Invitación creada. Copia el enlace para compartirlo con esa persona.')
+        return
+      }
       // Abrir WhatsApp con la invitación pre-redactada (eliges el contacto allí)
       const text = encodeURIComponent(
         `¡Hola! 👋 Te invito a unirte a *${BRAND.appName}*, la plataforma de tareas y agentes de IA de ${BRAND.company}.\n\n` +
@@ -381,8 +392,9 @@ function InviteModal({ onClose, showToast, isSuperAdmin }) {
       onClose()
     } catch (e) {
       showToast('Error al crear la invitación', 'error')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   return (
@@ -394,7 +406,7 @@ function InviteModal({ onClose, showToast, isSuperAdmin }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="form-group">
-            <label className="form-label">Correo de Google del invitado</label>
+            <label className="form-label">{useLocalSql ? 'Correo del invitado' : 'Correo de Google del invitado'}</label>
             <input className="form-input" type="email" value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="persona@gmail.com" autoFocus
@@ -408,10 +420,11 @@ function InviteModal({ onClose, showToast, isSuperAdmin }) {
             </select>
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-3)', margin: 0, lineHeight: 1.5 }}>
-            Se abrirá <strong>WhatsApp</strong> con la invitación pre-redactada: solo
+            {useLocalSql ? 'El enlace permite crear una contraseña y vence en 48 horas. Compártelo solo con la persona invitada.' : <>Se abrirá <strong>WhatsApp</strong> con la invitación pre-redactada: solo
             elige el contacto y envíala. Cuando la persona entre con ese correo de
-            Google, su cuenta quedará activa de inmediato sin necesidad de aprobación.
+            Google, su cuenta quedará activa de inmediato sin necesidad de aprobación.</>}
           </p>
+          {invitationUrl && <div className="form-group"><label className="form-label" htmlFor="invitation-url">Enlace de invitación</label><input id="invitation-url" className="form-input" readOnly value={invitationUrl} onFocus={e => e.target.select()} /></div>}
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>

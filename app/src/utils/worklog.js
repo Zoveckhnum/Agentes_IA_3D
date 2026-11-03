@@ -1,5 +1,5 @@
 import { db } from '../firebase.js'
-import { doc, setDoc, increment, serverTimestamp } from 'firebase/firestore'
+import { doc, setDoc, increment, serverTimestamp } from '../data/firestore.js'
 
 // Clave del día local: YYYY-MM-DD
 export function todayKey(date = new Date()) {

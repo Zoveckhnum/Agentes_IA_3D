@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { db } from '../firebase.js'
-import { collection, addDoc, onSnapshot, orderBy, query, limit, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, onSnapshot, orderBy, query, limit, serverTimestamp } from '../data/firestore.js'
 import Icon from './Icons.jsx'
 import { AgentAvatar } from './AgentModal.jsx'
 

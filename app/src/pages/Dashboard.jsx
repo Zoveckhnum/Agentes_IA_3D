@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useApp, SUPER_ADMIN_EMAIL } from '../App.jsx'
 import { db } from '../firebase.js'
-import { doc, updateDoc, serverTimestamp, onSnapshot, collection, query, where } from 'firebase/firestore'
+import { doc, updateDoc, serverTimestamp, onSnapshot, collection, query, where } from '../data/firestore.js'
 import { logWork, todayKey } from '../utils/worklog.js'
 import { sortByPriorityAndAge, inPeriod, PeriodFilter, wipLimitReached, WIP_LIMIT } from './KanbanView.jsx'
 import Icon from '../components/Icons.jsx'

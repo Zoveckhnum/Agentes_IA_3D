@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, setDoc } from '../data/firestore.js'
 
 export default function ClientsAdmin() {
   const { clients, tasks, users, showToast } = useApp()
