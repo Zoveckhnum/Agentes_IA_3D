@@ -7,9 +7,9 @@ import { execFileSync } from 'node:child_process'
 import { prepareProject, validateProjectId, taskBranch, repositoryUrl } from './espacios-proyecto.mjs'
 
 function fixture(t) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'agentes-espacios-')))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'agentes-espacios-')))
   t.after(() => {
-    const parent = realpathSync(tmpdir())
+    const parent = realpathSync.native(tmpdir())
     assert.ok(relative(parent, resolve(root)).startsWith('agentes-espacios-'))
     rmSync(root, { recursive: true, force: true })
   })
@@ -42,7 +42,7 @@ test('prepara un repositorio independiente y una rama de tarea sin push ni ejecu
   const prepared = await prepareProject(args)
   assert.equal(prepared.cwd, join(root, 'products', 'demo'))
   assert.equal(git(['branch', '--show-current'], prepared.cwd), 'agent/t-1')
-  assert.equal(git(['rev-parse', '--show-toplevel'], prepared.cwd).replaceAll('\\', '/'), prepared.cwd.replaceAll('\\', '/'))
+  assert.equal(realpathSync.native(git(['rev-parse', '--show-toplevel'], prepared.cwd)), realpathSync.native(prepared.cwd))
   assert.ok(calls.every(a => a.includes('protocol.file.allow=never') && a.some(x => x.startsWith('core.hooksPath='))))
   assert.ok(!calls.some(a => a.includes('push') || a.includes('reset') || a.includes('clean')))
   await prepareProject(args)

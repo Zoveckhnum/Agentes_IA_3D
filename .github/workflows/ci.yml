@@ -22,7 +22,6 @@ jobs:
       CORE_DB_TRUSTED_CONNECTION: 'true'
       CORE_DB_ENCRYPT: 'true'
       CORE_DB_TRUST_SERVER_CERTIFICATE: 'false'
-      APP_CI_GIT_DIAG: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
