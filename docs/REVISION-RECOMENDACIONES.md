@@ -10,9 +10,13 @@ Actualización operativa posterior: se implementó el piloto de [CI/CD parcial](
 y se verificó la protección de `feat/sql-local` con el check obligatorio para todos.
 También quedó activo [Auto-loop y memoria](AUTO-LOOP-Y-MEMORIA.md) para tareas nuevas,
 con identidad propia, asignaciones transaccionales y prueba real en staging.
+También quedó operativa la [aprobación humana por Telegram](APROBACIONES-TELEGRAM.md):
+rechazo real, aprobación y continuación del motor en staging, y publicación IIS real
+autorizada por el propietario. El portal y el motor productivo quedaron reactivados.
 Las secciones detalladas y el orden propuesto al final conservan la revisión inicial
 como historial; sus afirmaciones sobre el motor detenido o la memoria ausente fueron
-superadas por esta implementación. Los apartados 4–6 conservan sus brechas generales.
+superadas por estas implementaciones. Los apartados 5–6 conservan sus brechas generales;
+en SQL y Drive faltan pruebas operativas con cambios concretos revisados y autorizados.
 
 Esta revisión distingue código existente de capacidades operativas. Las recomendaciones
 son criterios para evaluar; no autorizan por sí mismas despliegues, cambios de esquema,
@@ -25,7 +29,7 @@ mensajes a terceros ni la activación del motor. No se realizaron esas acciones.
 | 1. Roles y habilidades | Fichas e integración implementadas | 24 roles con actividades, entregas, aceptación, límites y requisitos; 35 skills de skills.sh fijadas por commit y SHA-256. El motor y QA reciben la ficha efectiva y rutas de guías verificadas. Falta evaluar la calidad de ejecuciones reales cuando se active el motor. |
 | 2. Aislamiento y CI/CD | Aislamiento implementado; CI/CD parcial | Repositorios en `products/<id>`, ramas `agent/<task_id>`, worktrees, bloqueos locales y archivos de entrega con hashes. Hay despliegue/reversión IIS de esta aplicación, pero no una cadena general de agentes que cree commits atómicos, compile, obtenga aprobación y despliegue cualquier proyecto registrado. |
 | 3. Auto-loop y memoria | Operativo para tareas nuevas; tres capas implementadas | Servicio Windows con identidad propia, corte de activación persistente, asignaciones SQL atómicas, renovación/cancelación, límites y memoria Markdown por cliente/proyecto con índice y respaldo diario. Prueba real: entrega desde memoria y tarea antigua intacta. La memoria de producción comienza vacía; las preferencias/manuales se cargan desde fuentes revisadas. Telegram/chats automáticos y barreras generales siguen separados. |
-| 4. Aprobación humana por Telegram | Parcial; botones y autorización persistente pendientes | Hay recepción de mensajes privados del propietario, respuestas a preguntas y avisos de entrega. No hay manejo de `callback_query`, botones Aprobar/Rechazar ni un registro de autorizaciones ligado a una operación y revisión concretas. |
+| 4. Aprobación humana por Telegram | Operativa para solicitudes y publicación de esta app | Bot privado con botones, propietario/mensaje/nonce vinculados, plan inmutable con hash/destino/vencimiento y consumo único por ejecutor separado. Rechazo real bloqueó el consumo; aprobación real permitió continuar una tarea sintética; otra aprobación publicó el candidato IIS probado. SQL y Drive tienen ejecutores y pruebas de contrato, sin haber aplicado DDL ni subido documentos oficiales como prueba. |
 | 5. Optimización de tokens | Controles básicos; compresión/caché pendientes | Hay límites de tiempo, herramientas, longitud y etapas; se guarda uso de tokens. No se encontró proxy de compresión ni caché semántica. No se han medido ahorros porcentuales. |
 | 6. Barreras de seguridad | Parcial | Hay validación de rutas y enlaces, filtrado de archivos/credenciales, entorno reducido para Codex, sandbox solicitado, SQL restringido y configuración CMS. No se encontró un ejecutor central con bloqueo explícito de comandos destructivos ni integración de actividad del motor con Windows Event Log. |
 
@@ -89,7 +93,7 @@ manuales y lecciones aprendidas con búsqueda y política de actualización/rete
 No es obligatorio añadir Redis o SQLite para la máquina de estados: la instalación ya
 dispone de SQL Server, pero aún falta un servicio de ejecución del motor configurado.
 
-## 4. Aprobaciones
+## 4. Aprobaciones (revisión inicial)
 
 Evidencia: [telegram.mjs](../motor/telegram.mjs),
 [reglas de agentes](../motor/AGENTS.md), [integraciones](../motor/integraciones.mjs).
@@ -101,6 +105,14 @@ en un prompt no sustituye una autorización persistente que un ejecutor valide.
 La autorización futura debe identificar operación, proyecto, revisión/hash, aprobador,
 vencimiento y consumo único. Aprobar QA no debe aprobar automáticamente un despliegue,
 una migración SQL o un documento oficial. No se envió ningún mensaje para esta revisión.
+
+Esta brecha se atendió posteriormente con `motor/hitl`, un servicio del bot sin
+privilegios administrativos y un ejecutor SYSTEM independiente. El motor solo solicita
+y consulta; espera `executed` antes de continuar. La prueba real en staging terminó
+en `HITL_OK` con una solicitud y dos intentos del modelo: solicitud y continuación.
+La publicación autorizada instaló el candidato `e8413af` en producción; se verificaron
+HTTPS, SQL cifrado con certificado validado y los mismos 24 agentes y diez tareas.
+El manual enlazado documenta alcance, límites y operaciones todavía no ejercitadas.
 
 ## 5. Tokens
 

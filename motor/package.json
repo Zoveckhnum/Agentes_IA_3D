@@ -8,7 +8,7 @@
     "start": "node worker.mjs",
     "check": "node worker.mjs --check",
     "check:codex": "node codex-check.mjs",
-    "test": "node --test codex-runner.test.mjs role-skills.test.mjs integraciones.test.mjs continuidad.test.mjs espacios-proyecto.test.mjs registro-proyectos.test.mjs tareas-proyecto.test.mjs auto-loop.test.mjs memoria.test.mjs",
+    "test": "node --test codex-runner.test.mjs role-skills.test.mjs integraciones.test.mjs continuidad.test.mjs espacios-proyecto.test.mjs registro-proyectos.test.mjs tareas-proyecto.test.mjs auto-loop.test.mjs memoria.test.mjs hitl/hitl.test.mjs",
     "codex": "codex",
     "agentes": "node worker.mjs --agents",
     "crear-agentes": "node worker.mjs --crear-agentes"

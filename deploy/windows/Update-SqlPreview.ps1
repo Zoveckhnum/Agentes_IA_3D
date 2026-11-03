@@ -53,6 +53,10 @@ try{
     Start-Sleep -Seconds 1
   }
   if(-not $ready){throw 'La nueva versión no cumple salud y permisos SQL'}
+  $phase='frontend-smoke'
+  $page=Invoke-WebRequest -Uri 'http://127.0.0.1:10011/' -UseBasicParsing -TimeoutSec 10
+  $expected=[IO.File]::ReadAllText((Join-Path $newRelease 'public\index.html'))
+  if($page.StatusCode -ne 200 -or $page.Content -ne $expected){throw 'La página publicada no coincide con la versión revisada'}
   @{format='stackbi-app-release-v1';release=(Split-Path $newRelease -Leaf);verified=$true;sourceSHA256=$sourceHash;createdAt=(Get-Date).ToUniversalTime().ToString('o')}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $newRelease '.release.json') -Encoding UTF8
   if(-not(Test-Path -LiteralPath (Join-Path $oldRelease '.release.json'))){@{format='stackbi-app-release-v1';release=(Split-Path $oldRelease -Leaf);verified=$true;baseline=$true}|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $oldRelease '.release.json') -Encoding UTF8}
   $deployment.release=$newRelease;$deployment.origin=$PublicOrigin

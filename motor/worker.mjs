@@ -24,6 +24,7 @@ import { effectiveAgentRole } from '../shared/role-profile.mjs'
 import { roleSummary } from './role-skills.mjs'
 import { createTaskLease, admittedTask, validateLoopPolicy, acquireLoopLock, checkStorage } from './auto-loop.mjs'
 import { createMemory, memoryContext } from './memoria.mjs'
+import { humanClient,approvalResolution } from './hitl/client.mjs'
 import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync, statSync, renameSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -80,7 +81,7 @@ const loopEnabled = !!env.AGENTES_LOOP_POLICY
 const loopPolicy = loopEnabled ? validateLoopPolicy(JSON.parse(readFileSync(env.AGENTES_LOOP_POLICY, 'utf8').replace(/^\uFEFF/, ''))) : null
 const stateRoot = env.AGENTES_STATE_ROOT || ROOT
 const memory = loopEnabled ? createMemory(join(stateRoot, 'memories')) : null
-let currentLease = null, unlockLoop = null, pollTimer = null, activeRun = null
+let currentLease = null, unlockLoop = null, pollTimer = null, activeRun = null, approvalTimer = null, checkingApprovals = false
 const loopLedgerPath = join(stateRoot, 'daily-budget.json')
 function dailyBudget(consume = false) {
   const day = new Date().toISOString().slice(0, 10)
@@ -186,6 +187,7 @@ function toolsFor(agent) {
   for (const g of p.herramientas || ['web', 'archivos', 'skills']) for (const t of groups[g] || [g]) list.add(t)
   for (const t of p.herramientasExtra || []) list.add(t)
   if (folderFor(agent)) for (const t of groups.drive_crear || []) list.add(t)
+  if(loopEnabled && env.APP_HITL_CREDENTIAL_FILE)list.add('aprobaciones_solicitar')
   return [...list]
 }
 
@@ -463,7 +465,30 @@ function buildPrompt(agent, t) {
 
 // ---------- OpenAI Codex ----------
 const invokeCodex = createCodexRunner(env)
-const runCodex = (prompt, cwd, options = {}) => invokeCodex(prompt, cwd, { ...options, signal: currentLease?.signal || options.signal })
+const runCodex = (prompt, cwd, options = {}) => invokeCodex(prompt, cwd, { ...options, signal: currentLease?.signal || options.signal, taskId:running||'' })
+
+async function approvalRecords(t, ids) {
+  const client=humanClient(env),records=[]
+  for(const id of ids){const record=await client('/requests/'+id);if(record.taskId!==t.id||(t.projectId&&record.project!==t.projectId))throw new Error('La aprobación corresponde a otra tarea o proyecto.');records.push(record)}
+  return records
+}
+async function resumeHumanApprovals() {
+  if(stopping || checkingApprovals || !loopEnabled || !env.APP_HITL_CREDENTIAL_FILE)return
+  checkingApprovals=true
+  try{
+    for(const task of tasks.values()){
+      if(task.agentStatus!=='needs_approval'||task.estado!=='en_espera'||task.autoLoopOwner||!admittedTask(task,loopPolicy)||!task.humanApprovalRequests?.length)continue
+      const records=await approvalRecords(task,task.humanApprovalRequests)
+      const resolution=approvalResolution(task,records)
+      if(resolution==='blocked'){
+        await updateDocIf(doc(db,'tasks',task.id),{agentStatus:'approval_blocked',agentError:'La operación fue rechazada, venció o falló. Revisa el recibo antes de preparar otra solicitud.'},{agentStatus:'needs_approval',estado:'en_espera',autoLoopOwner:null,humanApprovalRequests:task.humanApprovalRequests})
+      }else if(resolution==='resume'){
+        const receipts=records.map(r=>({id:r.id,kind:r.kind,status:r.status,planSHA256:r.planSHA256,result:r.result}))
+        await updateDocIf(doc(db,'tasks',task.id),{estado:'en_revision',agentStatus:'queued',humanApprovalRequests:[],humanApprovalHistory:[...(task.humanApprovalHistory||[]),...receipts].slice(-20),feedback:((task.feedback||'')+'\nRecibos del ejecutor autorizado (no repitas las operaciones):\n'+JSON.stringify(receipts)).slice(-20000)},{agentStatus:'needs_approval',estado:'en_espera',autoLoopOwner:null,humanApprovalRequests:task.humanApprovalRequests})
+      }
+    }
+  }finally{checkingApprovals=false}
+}
 
 // ---------- ejecutar una tarea ----------
 async function runTask(t) {
@@ -552,6 +577,17 @@ async function executeTask(t, setWorkspace) {
     agentLastRunAt: serverTimestamp(),
     ...(res.json?.usage ? { agentLastUsage: res.json.usage } : {}),
     ...(stillMine ? { estado: 'en_espera' } : {}),
+  }
+
+  if(res.json?.approval_requests?.length){
+    const ids=res.json.approval_requests.map(r=>r.requestId),records=await approvalRecords(t,ids)
+    if(records.some(r=>r.status!=='executed')){
+      const blocked=records.some(r=>['rejected','expired','failed'].includes(r.status))
+      await updateTask(ref,{...base,agentStatus:blocked?'approval_blocked':'needs_approval',humanApprovalRequests:ids,agentOutput:result.slice(0,MAX_OUTPUT),agentError:blocked?'La autorización fue rechazada, venció o falló.':'',...(stillMine?{estado:'en_espera'}:{})})
+      return
+    }
+    base.humanApprovalHistory=[...(t.humanApprovalHistory||[]),...records.map(r=>({id:r.id,kind:r.kind,status:r.status,planSHA256:r.planSHA256,result:r.result}))].slice(-20)
+    base.humanApprovalRequests=[]
   }
 
   if (failed) {
@@ -846,6 +882,7 @@ async function main() {
     if(!capability.ok || !(await capability.json()).atomicClaims) throw new Error('La API no admite asignaciones atómicas. El motor permanece detenido.')
     unlockLoop = acquireLoopLock(join(stateRoot, 'state'))
     pollTimer = setInterval(pump, 15000)
+    approvalTimer = setInterval(()=>resumeHumanApprovals().catch(()=>log('No se pudo consultar el estado de aprobaciones.')),15000)
   }
 
   onSnapshot(collection(db, 'agents'), snap => {
@@ -892,6 +929,7 @@ async function shutdown() {
   if (stopping) return
   stopping = true
   clearInterval(pollTimer)
+  clearInterval(approvalTimer)
   currentLease?.stop()
   log('Apagando motor…')
   telegram?.stop()

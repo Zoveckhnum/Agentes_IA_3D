@@ -49,6 +49,13 @@ const employee = { uid: 'employee', email: 'employee@test.invalid', role: 'emple
 const admin = { uid: 'admin', email: 'admin@test.invalid', role: 'admin', isSuper: true }
 const worker = { uid: 'worker', email: 'worker@test.invalid', worker: true }
 const lookup = async path => path === 'agents/agent' ? {} : null
+
+test('la UI no puede fabricar recibos humanos ni completar una operación pendiente', async () => {
+  const before={asignado:'agent',createdBy:admin.email,estado:'en_espera',agentStatus:'needs_approval',humanApprovalRequests:['request-id']}
+  await assert.rejects(authorizeWrite(admin,{path:'tasks/test'},before,{...before,humanApprovalRequests:[]},lookup))
+  await assert.rejects(authorizeWrite(admin,{path:'tasks/test'},before,{...before,estado:'completada'},lookup))
+  await assert.rejects(authorizeWrite(admin,{path:'tasks/test'},before,{...before,humanApprovalHistory:[{status:'executed'}]},lookup))
+})
 test('el usuario pendiente no puede leer tareas ni adquirir rol de administrador', async () => {
   const pending = { uid: 'new', email: 'new@test.invalid', role: 'pending' }
   assert.equal(canRead(pending, 'tasks/a'), false)

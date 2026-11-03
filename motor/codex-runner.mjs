@@ -2,6 +2,7 @@ import { Codex } from '@openai/codex-sdk'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createRoleSkillContext } from './role-skills.mjs'
+import { uuid } from './hitl/core.mjs'
 
 const rules = readFileSync(new URL('AGENTS.md', import.meta.url), 'utf8')
 const TOOL_ITEMS = new Set(['command_execution', 'mcp_tool_call', 'file_change', 'web_search'])
@@ -17,30 +18,32 @@ export function codexEnvironment(env, agentName, color) {
 }
 
 export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 25 * 60 * 1000 } = {}) {
-  return async function runCodex(prompt, cwd, { tools = ['web_search'], resume, agentName, color, maxTurns = 40, outputSchema, roleId = 'personalizado', signal } = {}) {
+  return async function runCodex(prompt, cwd, { tools = ['web_search'], resume, agentName, color, maxTurns = 40, outputSchema, roleId = 'personalizado', signal, taskId = '' } = {}) {
     const controller = new AbortController()
     let reason = '', result = '', sessionId = resume || null, usage = null, completed = false
     const toolNames = new Set()
+    const approvalRequests = new Map()
     const timer = setTimeout(() => {
       reason = `Tiempo máximo agotado (${Math.round(timeoutMs / 1000)} s).`
       controller.abort()
     }, timeoutMs)
     const response = (failed, error = '') => ({
       code: failed ? 1 : 0,
-      json: { result: failed ? '' : result, session_id: sessionId, is_error: failed, usage, tools_used: [...toolNames] },
+      json: { result: failed ? '' : result, session_id: sessionId, is_error: failed, usage, tools_used: [...toolNames], approval_requests:[...approvalRequests.values()] },
       err: failed ? (reason || error || 'Codex no completó la respuesta.') : '',
     })
     const canWriteProjects = tools.includes('proyectos_integracion')
     const canRegisterProjects = canWriteProjects || tools.includes('proyectos_registro')
     const canReadProjects = canWriteProjects || tools.includes('proyectos_lectura')
+    const canRequestApprovals = tools.includes('aprobaciones_solicitar') && !!env.APP_HITL_CREDENTIAL_FILE
     try {
       if (signal?.aborted) return response(true, 'Ejecución cancelada antes de iniciar.')
       const roleContext = createRoleSkillContext(roleId)
       const codex = new CodexClient({
         ...(env.CODEX_API_KEY || env.OPENAI_API_KEY ? { apiKey: env.CODEX_API_KEY || env.OPENAI_API_KEY } : {}),
         env: codexEnvironment(env, agentName, color),
-        ...(canRegisterProjects || canReadProjects ? {
-          config: { mcp_servers: { proyectos: {
+        ...(canRegisterProjects || canReadProjects || canRequestApprovals ? {
+          config: { mcp_servers: { ...(canRegisterProjects || canReadProjects ? { proyectos: {
             command: process.execPath,
             args: [fileURLToPath(new URL('proyectos-mcp.mjs', import.meta.url)), cwd, canWriteProjects ? 'write' : canRegisterProjects ? (canReadProjects ? 'register-read' : 'register') : 'read'],
             startup_timeout_sec: 20,
@@ -56,7 +59,13 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
                 drive_guardar: { approval_mode: 'approve' },
               } : {}),
             } } : {}),
-          } } },
+          } } : {}), ...(canRequestApprovals ? {aprobaciones:{
+            command:process.execPath,args:[fileURLToPath(new URL('hitl/mcp.mjs',import.meta.url)),taskId],
+            env:{APP_HITL_CREDENTIAL_FILE:env.APP_HITL_CREDENTIAL_FILE},
+            startup_timeout_sec:20,tool_timeout_sec:30,
+            enabled_tools:['solicitar_aprobacion','estado_aprobacion'],
+            tools:{solicitar_aprobacion:{approval_mode:'approve'}},
+          }} : {}) } },
         } : {}),
       })
       const options = {
@@ -80,6 +89,12 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
         }
         if (event.type === 'item.completed' && event.item.type === 'agent_message') result = event.item.text
         if (event.type === 'item.completed' && event.item.type === 'mcp_tool_call') toolNames.add(`${event.item.server}.${event.item.tool}`)
+        if(event.type==='item.completed' && event.item.type==='mcp_tool_call' && event.item.server==='aprobaciones' && event.item.tool==='solicitar_aprobacion'){
+          for(const block of event.item.result?.content||[])try{
+            const value=JSON.parse(block.text)
+            if(uuid(value.requestId)&&['pending','approved','rejected','expired','executing','executed','failed'].includes(value.status))approvalRequests.set(value.requestId,{requestId:value.requestId,status:value.status})
+          }catch{}
+        }
         if (event.type === 'turn.completed') { completed = true; usage = event.usage }
         if (event.type === 'turn.failed' || event.type === 'error') {
           reason = event.error?.message || event.message || 'Error de Codex.'
