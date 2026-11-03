@@ -4,6 +4,10 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { devNull } from 'node:os'
 
+// GetFinalPathNameByHandle expands Windows 8.3 aliases used by hosted runners.
+// Use the same canonical form for containment and repository identity checks.
+const canonicalPath = realpathSync.native
+
 const execute = promisify(execFile)
 const SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/
 const TASK = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/
@@ -32,7 +36,7 @@ export function checkedDirectory(parent, name) {
   if (existsSync(target)) {
     const stat = lstatSync(target)
     if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error('El directorio del proyecto no puede ser un enlace ni un archivo.')
-    if (relative(parent, realpathSync(target)) !== rel) throw new Error('Destino de proyecto inválido.')
+    if (relative(canonicalPath(parent), canonicalPath(target)) !== rel) throw new Error('Destino de proyecto inválido.')
   } else {
     // existsSync devuelve false para enlaces rotos; lstat permite detectarlos.
     try { lstatSync(target); throw new Error('Destino de proyecto inválido.') }
@@ -59,7 +63,7 @@ export const gitOptions = () => ['-c', `core.hooksPath=${devNull}`, '-c', 'proto
 export async function prepareRepository({ root, id, github, git = runGit }) {
   validateProjectId(id)
   const remote = repositoryUrl(github)
-  const workspace = realpathSync(resolve(root))
+  const workspace = canonicalPath(resolve(root))
   const products = checkedDirectory(workspace, 'products')
   mkdirSync(products, { recursive: true })
   const cwd = checkedDirectory(products, id)
@@ -75,7 +79,9 @@ export async function prepareRepository({ root, id, github, git = runGit }) {
   const gitDir = checkedDirectory(cwd, '.git')
   if (!existsSync(gitDir)) throw new Error('El destino existe pero no es un repositorio independiente. Consérvalo y usa otro ID.')
   const top = await command(['rev-parse', '--show-toplevel'])
-  if (relative(realpathSync(cwd), realpathSync(top))) throw new Error('El repositorio no coincide con el directorio del proyecto.')
+  if (relative(canonicalPath(cwd), canonicalPath(top))) {
+    throw new Error('El repositorio no coincide con el directorio del proyecto.')
+  }
   const origin = await command(['remote', 'get-url', 'origin'])
   if (origin !== remote) throw new Error('El repositorio local tiene otro origen. No se cambiará automáticamente.')
   if (created) await command(['checkout', '--detach', 'HEAD'])

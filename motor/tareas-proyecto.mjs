@@ -18,7 +18,7 @@ export async function projectTaskUnchanged(workspace, revision) {
 export async function openProjectTask({ root, projectId, github, taskId, git = runGit }) {
   validateProjectId(projectId)
   const branch = taskBranch(taskId)
-  root = realpathSync(root)
+  root = realpathSync.native(root)
   const local = checkedDirectory(root, '.local'); mkdirSync(local, { recursive: true })
   const locks = checkedDirectory(local, 'project-locks'); mkdirSync(locks, { recursive: true })
   const lock = join(locks, `${projectId}.lock`)
@@ -29,7 +29,7 @@ export async function openProjectTask({ root, projectId, github, taskId, git = r
   const release = () => { if (!released) { released = true; closeSync(descriptor); unlinkSync(lock) } }
   try {
     const repository = await prepareRepository({ root, id: projectId, github, git })
-    const products = realpathSync(join(root, 'products'))
+    const products = realpathSync.native(join(root, 'products'))
     const runs = checkedDirectory(products, '.tareas'); mkdirSync(runs, { recursive: true })
     const projectRuns = checkedDirectory(runs, projectId); mkdirSync(projectRuns, { recursive: true })
     const cwd = checkedDirectory(projectRuns, taskId)
@@ -43,9 +43,9 @@ export async function openProjectTask({ root, projectId, github, taskId, git = r
     checkedDirectory(projectRuns, taskId)
     const metadata = join(cwd, '.git')
     if (!existsSync(metadata) || lstatSync(metadata).isSymbolicLink() || !lstatSync(metadata).isFile()) throw new Error('El espacio debe ser un worktree administrado, sin enlaces.')
-    const top = realpathSync(await command(['rev-parse', '--show-toplevel']))
-    const common = realpathSync(resolve(cwd, await command(['rev-parse', '--git-common-dir'])))
-    if (relative(cwd, top) || relative(realpathSync(join(repository.cwd, '.git')), common)) throw new Error('El espacio de tarea pertenece a otro repositorio.')
+    const top = realpathSync.native(await command(['rev-parse', '--show-toplevel']))
+    const common = realpathSync.native(resolve(cwd, await command(['rev-parse', '--git-common-dir'])))
+    if (relative(cwd, top) || relative(realpathSync.native(join(repository.cwd, '.git')), common)) throw new Error('El espacio de tarea pertenece a otro repositorio.')
     if (await command(['branch', '--show-current']) !== branch) throw new Error('La rama del espacio de tarea fue cambiada. Se requiere revisión.')
     const state = checkedDirectory(cwd, '.agentes'); mkdirSync(state, { recursive: true })
     return { cwd, state, branch, head: await command(['rev-parse', 'HEAD']), command, release }
@@ -58,7 +58,7 @@ export function archiveProject(cwd, taskRoot) {
   for (const file of files) safeFile(cwd, file.path)
   // Una carpeta nueva por revisión evita mezclar archivos de intentos anteriores.
   const revision = fileRevision(files)
-  const archiveRoot = checkedDirectory(realpathSync(taskRoot), 'revisiones')
+  const archiveRoot = checkedDirectory(realpathSync.native(taskRoot), 'revisiones')
   mkdirSync(archiveRoot, { recursive: true })
   const archive = checkedDirectory(archiveRoot, revision)
   const created = !existsSync(archive)
@@ -76,7 +76,7 @@ export function archiveProject(cwd, taskRoot) {
 
 export function taskInputDirectory(root, id, task) {
   if (!/^[\w-]+$/.test(id)) throw new Error('ID de insumo inválido.')
-  const taskRoot = checkedDirectory(realpathSync(root), id)
+  const taskRoot = checkedDirectory(realpathSync.native(root), id)
   if (!task.projectSnapshot) return taskRoot
   if (!/^[a-f0-9]{64}$/.test(task.projectSnapshot)) throw new Error('Revisión de proyecto inválida.')
   const revisions = checkedDirectory(taskRoot, 'revisiones')

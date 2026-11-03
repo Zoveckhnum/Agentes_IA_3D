@@ -15,8 +15,14 @@ try {
     [Environment]::SetEnvironmentVariable($name,$variable.Value,'Process')
   }
   $package=$null
-  & 'C:\Program Files\nodejs\node.exe' $EntryScript
-  $result=$LASTEXITCODE
+  $nativePreference=$ErrorActionPreference
+  try {
+    # Windows PowerShell maps native stderr to ErrorRecords. A warning written by
+    # Node must not terminate a healthy process; its exit code remains authoritative.
+    $ErrorActionPreference='Continue'
+    & 'C:\Program Files\nodejs\node.exe' $EntryScript
+    $result=$LASTEXITCODE
+  } finally { $ErrorActionPreference=$nativePreference }
 } catch {
   # Never print decrypted values, connection strings or private exception payloads.
   Write-Error 'No se pudo iniciar la aplicación con la configuración protegida.'
