@@ -2,7 +2,7 @@ name: StackBI CI
 on:
   pull_request:
   push:
-    branches: [main, feat/sql-local, feat/cicd-iis-pilot, feat/auto-loop-memoria, feat/hitl-telegram]
+    branches: [main, feat/sql-local, feat/cicd-iis-pilot, feat/auto-loop-memoria, feat/hitl-telegram, feat/optimizacion-tokens]
   workflow_dispatch:
 permissions:
   contents: read
