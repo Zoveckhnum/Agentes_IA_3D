@@ -22,6 +22,7 @@ jobs:
       CORE_DB_TRUSTED_CONNECTION: 'true'
       CORE_DB_ENCRYPT: 'true'
       CORE_DB_TRUST_SERVER_CERTIFICATE: 'false'
+      APP_CI_GIT_DIAG: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,11 +39,13 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm ci --prefix server --omit=dev
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Verify unit contracts and role bundles
+        run: node tools/ci/checks.mjs --unit-only
       - name: Prepare disposable SQL with certificate validation
         shell: powershell
         run: .\tools\ci\Install-CiSql.ps1
       - name: Test roles, unit contracts, real SQL integration and build
-        run: node tools/ci/checks.mjs
+        run: node tools/ci/checks.mjs --integration-build
       - name: Package the exact Windows runtime and compiled frontend
         run: node tools/ci/package.mjs
       - name: Publish immutable candidate

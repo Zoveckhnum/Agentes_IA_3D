@@ -75,7 +75,10 @@ export async function prepareRepository({ root, id, github, git = runGit }) {
   const gitDir = checkedDirectory(cwd, '.git')
   if (!existsSync(gitDir)) throw new Error('El destino existe pero no es un repositorio independiente. Consérvalo y usa otro ID.')
   const top = await command(['rev-parse', '--show-toplevel'])
-  if (relative(realpathSync(cwd), realpathSync(top))) throw new Error('El repositorio no coincide con el directorio del proyecto.')
+  if (relative(realpathSync(cwd), realpathSync(top))) {
+    if(process.env.APP_CI_GIT_DIAG==='true') console.error(JSON.stringify({event:'ci_git_path_mismatch',expected:realpathSync(cwd),actual:realpathSync(top),gitEnvironmentKeys:Object.keys(process.env).filter(n=>n.startsWith('GIT_'))}))
+    throw new Error('El repositorio no coincide con el directorio del proyecto.')
+  }
   const origin = await command(['remote', 'get-url', 'origin'])
   if (origin !== remote) throw new Error('El repositorio local tiene otro origen. No se cambiará automáticamente.')
   if (created) await command(['checkout', '--detach', 'HEAD'])
