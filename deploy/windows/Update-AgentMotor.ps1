@@ -20,19 +20,28 @@ $beforeMeta=Get-Content -LiteralPath $metaPath -Raw
 $secret=Join-Path $root 'secrets\environment.p7m'
 Copy-Item -LiteralPath $secret -Destination ($secret+'.before-human') -Force
 Stop-Service StackBI-AgentMotor
+$phase='lock'
 try{
   if(Test-Path -LiteralPath (Join-Path $root 'data\state\worker.lock')){throw 'El motor dejó un bloqueo; verificar que no quedan ejecuciones antes de retirarlo'}
+  $phase='credentials'
   $package=Unprotect-CmsMessage -Path $secret|ConvertFrom-Json
   $package.variables|Add-Member -NotePropertyName APP_HITL_CREDENTIAL_FILE -NotePropertyValue 'C:\ProgramData\StackBI\AgentMotor\secrets\approval-request.p7m' -Force
   Protect-CmsMessage -To (Get-Item ('Cert:\LocalMachine\My\'+$meta.cmsThumbprint)) -Content ($package|ConvertTo-Json -Depth 5 -Compress) -OutFile $secret
-  $xml=[xml]$beforeXml;$xml.service.arguments=$xml.service.arguments.Replace([string]$meta.release,$release);$xml.service.workingdirectory=$release;$xml.Save($xmlPath)
+  $phase='service-configuration'
+  $xml=[xml]$beforeXml
+  $xml.SelectSingleNode('/service/arguments').InnerText=$xml.service.arguments.Replace([string]$meta.release,[string]$release)
+  $xml.SelectSingleNode('/service/workingdirectory').InnerText=[string]$release
+  $xml.Save($xmlPath)
   $meta|Add-Member -NotePropertyName previousRelease -NotePropertyValue $meta.release -Force
   $meta.release=$release;$meta.commit=$commit;$meta|ConvertTo-Json -Depth 5|Set-Content -LiteralPath $metaPath -Encoding UTF8
+  $phase='service-start'
   Start-Service StackBI-AgentMotor
 }catch{
+  $failedPhase=$phase
+  $failedType=$_.Exception.GetType().Name
   Copy-Item -LiteralPath ($secret+'.before-human') -Destination $secret -Force
   [IO.File]::WriteAllText($xmlPath,$beforeXml,(New-Object Text.UTF8Encoding($false)));[IO.File]::WriteAllText($metaPath,$beforeMeta,(New-Object Text.UTF8Encoding($false)))
   Start-Service StackBI-AgentMotor
-  throw 'No se actualizó el motor; se restauró su configuración anterior'
+  throw "No se actualizó el motor; se restauró su configuración anterior. Fase: $failedPhase; tipo: $failedType"
 }finally{$package=$null}
 @{updated=$true;commit=$commit;policyPreserved=$true;credentialScope='request-only'}|ConvertTo-Json -Compress
