@@ -20,6 +20,9 @@ motor/media-config.json
 # Datos de trabajo del motor
 products/
 motor/logs/
+motor/state/
+motor/memories/
+motor/daily-budget.json
 motor/trabajos/
 motor/entregas/
 motor/modelos/

@@ -6,7 +6,13 @@ Documento de referencia: [Recomendaciones.md](../Recomendaciones.md), conservado
 
 Actualización posterior de esta revisión: se completaron las fichas de los 24 roles
 y la integración de 35 habilidades de skills.sh. Véase [ROLES-Y-HABILIDADES.md](ROLES-Y-HABILIDADES.md).
-Los apartados restantes conservan las brechas indicadas; el motor continúa detenido.
+Actualización operativa posterior: se implementó el piloto de [CI/CD parcial](CI-CD.md)
+y se verificó la protección de `feat/sql-local` con el check obligatorio para todos.
+También quedó activo [Auto-loop y memoria](AUTO-LOOP-Y-MEMORIA.md) para tareas nuevas,
+con identidad propia, asignaciones transaccionales y prueba real en staging.
+Las secciones detalladas y el orden propuesto al final conservan la revisión inicial
+como historial; sus afirmaciones sobre el motor detenido o la memoria ausente fueron
+superadas por esta implementación. Los apartados 4–6 conservan sus brechas generales.
 
 Esta revisión distingue código existente de capacidades operativas. Las recomendaciones
 son criterios para evaluar; no autorizan por sí mismas despliegues, cambios de esquema,
@@ -18,7 +24,7 @@ mensajes a terceros ni la activación del motor. No se realizaron esas acciones.
 | --- | --- | --- |
 | 1. Roles y habilidades | Fichas e integración implementadas | 24 roles con actividades, entregas, aceptación, límites y requisitos; 35 skills de skills.sh fijadas por commit y SHA-256. El motor y QA reciben la ficha efectiva y rutas de guías verificadas. Falta evaluar la calidad de ejecuciones reales cuando se active el motor. |
 | 2. Aislamiento y CI/CD | Aislamiento implementado; CI/CD parcial | Repositorios en `products/<id>`, ramas `agent/<task_id>`, worktrees, bloqueos locales y archivos de entrega con hashes. Hay despliegue/reversión IIS de esta aplicación, pero no una cadena general de agentes que cree commits atómicos, compile, obtenga aprobación y despliegue cualquier proyecto registrado. |
-| 3. Auto-loop y memoria | Bucle implementado pero detenido; memoria parcial | El worker tiene cola, estados, dependencias y continuaciones. Persiste conversaciones e insumos de tareas. No se encontró memoria de tres capas con documentos Markdown e índice de búsqueda. No hay proceso worker activo en esta comprobación. |
+| 3. Auto-loop y memoria | Operativo para tareas nuevas; tres capas implementadas | Servicio Windows con identidad propia, corte de activación persistente, asignaciones SQL atómicas, renovación/cancelación, límites y memoria Markdown por cliente/proyecto con índice y respaldo diario. Prueba real: entrega desde memoria y tarea antigua intacta. La memoria de producción comienza vacía; las preferencias/manuales se cargan desde fuentes revisadas. Telegram/chats automáticos y barreras generales siguen separados. |
 | 4. Aprobación humana por Telegram | Parcial; botones y autorización persistente pendientes | Hay recepción de mensajes privados del propietario, respuestas a preguntas y avisos de entrega. No hay manejo de `callback_query`, botones Aprobar/Rechazar ni un registro de autorizaciones ligado a una operación y revisión concretas. |
 | 5. Optimización de tokens | Controles básicos; compresión/caché pendientes | Hay límites de tiempo, herramientas, longitud y etapas; se guarda uso de tokens. No se encontró proxy de compresión ni caché semántica. No se han medido ahorros porcentuales. |
 | 6. Barreras de seguridad | Parcial | Hay validación de rutas y enlaces, filtrado de archivos/credenciales, entorno reducido para Codex, sandbox solicitado, SQL restringido y configuración CMS. No se encontró un ejecutor central con bloqueo explícito de comandos destructivos ni integración de actividad del motor con Windows Event Log. |

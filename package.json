@@ -34,7 +34,8 @@
     "ci:package": "node tools/ci/package.mjs",
     "cd:status": "node tools/cd.mjs status",
     "cd:approve": "node tools/cd.mjs approve",
-    "test:ci": "node --test deploy/cicd/cicd.test.mjs"
+    "test:ci": "node --test deploy/cicd/cicd.test.mjs",
+    "memoria": "node tools/memoria.mjs"
   },
   "devDependencies": {
     "firebase-tools": "15.34.2"

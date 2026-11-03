@@ -2,9 +2,10 @@ import { readFileSync, existsSync, realpathSync, statSync } from 'node:fs'
 import { resolve, relative, isAbsolute, basename } from 'node:path'
 import { createHash } from 'node:crypto'
 import { loadMotorEnv } from './env.mjs'
+import { pathToFileURL } from 'node:url'
 
 export const credentialsDir = new URL('credenciales/', import.meta.url)
-export const projectsFile = new URL('proyectos.json', import.meta.url)
+export const projectsFile = process.env.AGENTES_PROJECTS_CONFIG ? pathToFileURL(process.env.AGENTES_PROJECTS_CONFIG) : new URL('proyectos.json', import.meta.url)
 export function projects() {
   return existsSync(projectsFile) ? JSON.parse(readFileSync(projectsFile, 'utf8')) : {}
 }

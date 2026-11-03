@@ -2,7 +2,7 @@ name: StackBI CI
 on:
   pull_request:
   push:
-    branches: [main, feat/sql-local, feat/cicd-iis-pilot]
+    branches: [main, feat/sql-local, feat/cicd-iis-pilot, feat/auto-loop-memoria]
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,6 +35,8 @@ jobs:
           npm ci --prefix app
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm ci --prefix motor --ignore-scripts
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm ci --prefix deploy/motor-runtime --ignore-scripts
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm ci --prefix server --omit=dev
           if ($LASTEXITCODE) { exit $LASTEXITCODE }

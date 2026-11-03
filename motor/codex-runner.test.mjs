@@ -18,6 +18,18 @@ function fake(events) {
 const message = text => ({ type: 'item.completed', item: { type: 'agent_message', text } })
 const completed = { type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 5 } }
 
+test('una asignación cancelada no inicia una llamada y su señal llega al SDK', async () => {
+  const { Client, calls } = fake([message('OK'), completed])
+  const run = createCodexRunner({}, { CodexClient: Client })
+  const controller = new AbortController(); controller.abort()
+  assert.equal((await run('test', process.cwd(), { signal: controller.signal })).code, 1)
+  assert.equal(calls.length, 0)
+  const active = new AbortController()
+  assert.equal((await run('test', process.cwd(), { signal: active.signal })).code, 0)
+  const signal = calls.find(c => c[0] === 'run')[2].signal
+  active.abort(); assert.equal(signal.aborted, true)
+})
+
 test('registro local y consentimiento para borradores respetan los permisos del rol', async () => {
   for (const granted of [false, true]) {
     for (const capability of ['proyectos_integracion', 'proyectos_lectura', 'proyectos_registro']) {

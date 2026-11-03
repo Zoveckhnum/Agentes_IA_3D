@@ -9,7 +9,7 @@ try {
   if ($variables.Count -gt 64) { throw 'Demasiadas variables protegidas' }
   foreach($variable in $variables) {
     $name=$variable.Name
-    if ($name -notmatch '^(CORE_DB_[A-Z0-9_]+|WORKER_[A-Z0-9_]+|APP_[A-Z0-9_]+|AGENTES_[A-Z0-9_]+|NODE_ENV|PORT|PUBLIC_ORIGIN|ALLOW_LOCAL_HTTP)$') { throw 'Nombre de variable no permitido' }
+    if ($name -notmatch '^(CORE_DB_[A-Z0-9_]+|WORKER_[A-Z0-9_]+|APP_[A-Z0-9_]+|AGENTES_[A-Z0-9_]+|CODEX_HOME|NODE_ENV|PORT|PUBLIC_ORIGIN|ALLOW_LOCAL_HTTP)$') { throw 'Nombre de variable no permitido' }
     if ($variable.Value -isnot [string] -or $variable.Value.Length -gt 8192 -or $variable.Value.Contains([char]0)) { throw 'Valor de variable no permitido' }
     $old[$name]=[Environment]::GetEnvironmentVariable($name,'Process')
     [Environment]::SetEnvironmentVariable($name,$variable.Value,'Process')

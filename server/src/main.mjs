@@ -41,6 +41,7 @@ export function createApplication(database, config) {
   app.post('/api/auth/password', async (req, res) => { await auth.changePassword(req.actor, req.body, res); res.json({ ok: true }) })
   app.use('/api', (req, _res, next) => req.actor.mustChangePassword ? next(new ApiError(403, 'auth/password-change-required')) : next())
   app.post('/api/data/read', async (req, res) => res.json(await repository.read(req.actor, req.body)))
+  app.get('/api/worker/capabilities', (req, res, next) => req.actor.worker ? res.json({ atomicClaims: true, version: 1 }) : next(new ApiError(403, 'permission-denied')))
   app.post('/api/data/commit', async (req, res) => res.json(await repository.commit(req.actor, req.body)))
   app.use('/api', (_req, _res, next) => next(new ApiError(404, 'not-found')))
   if (config.staticRoot) {

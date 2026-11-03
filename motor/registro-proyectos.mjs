@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync, existsSync, lstatSync, openSync, closeSync, renameSync, unlinkSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { validateProjectId, repositoryUrl } from './espacios-proyecto.mjs'
 
-export const registryFile = new URL('proyectos.json', import.meta.url)
+export const registryFile = process.env.AGENTES_PROJECTS_CONFIG ? pathToFileURL(process.env.AGENTES_PROJECTS_CONFIG) : new URL('proyectos.json', import.meta.url)
 
 export function normalizeRepository(value) {
   if (typeof value !== 'string') throw new Error('Indica propietario/repositorio o una URL HTTPS de GitHub.')
