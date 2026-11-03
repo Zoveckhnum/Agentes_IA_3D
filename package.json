@@ -36,7 +36,8 @@
     "cd:approve": "node tools/cd.mjs approve",
     "test:ci": "node --test deploy/cicd/cicd.test.mjs",
     "memoria": "node tools/memoria.mjs",
-    "hitl": "node tools/hitl.mjs"
+    "hitl": "node tools/hitl.mjs",
+    "tokens": "node tools/tokens.mjs"
   },
   "devDependencies": {
     "firebase-tools": "15.34.2"

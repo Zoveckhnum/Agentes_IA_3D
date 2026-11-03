@@ -5,7 +5,7 @@ import { prepareRepository, checkedDirectory, validateProjectId, taskBranch, git
 import { snapshotFiles } from './calidad.mjs'
 import { safeFile } from './integraciones.mjs'
 
-const OMIT = new Set(['.agentes', 'dist', 'build', '.next', 'coverage'])
+const OMIT = new Set(['.agentes', '.context', 'dist', 'build', '.next', 'coverage'])
 export const projectFiles = cwd => snapshotFiles(cwd, OMIT)
 export const fileRevision = files => createHash('sha256').update(JSON.stringify(files.map(({ path, hash }) => ({ path, hash })))).digest('hex')
 
