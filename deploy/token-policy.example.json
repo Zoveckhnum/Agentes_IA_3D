@@ -1,0 +1,9 @@
+{
+  "format": "stackbi-token-policy-v1",
+  "maxPromptBytes": 98304,
+  "reservePerCall": 131072,
+  "maxDailyTokens": 2097152,
+  "maxProjectDailyTokens": 1048576,
+  "maxTaskTokens": 524288,
+  "maxRecords": 4000
+}

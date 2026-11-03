@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { referenceContext } from './token-optimization.mjs'
 import { join, dirname, resolve, relative, isAbsolute } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 
@@ -71,12 +72,13 @@ export async function reviewDelivery({ cwd, task, author, requiredRoles, agents,
         'Indica passed solo si comprobaste los criterios de aceptación aplicables; failed si encontraste defectos; blocked si falta información, herramientas o acceso. No inventes pruebas.',
         'evidence: comandos/resultados observados o referencias precisas de una revisión documental. issues: defectos pendientes. Explica claramente qué no se pudo verificar.',
         `Solicitud: ${task.tarea}\n${task.descripcion || ''}\nFeedback: ${task.feedback || ''}`,
-        `Entregable del autor:\n${result}`,
+        `Entregable del autor:\n${referenceContext(reviewDir,'Entregable del autor',result)}`,
       ].join('\n\n')
+      const reviewInputs=snapshotFiles(reviewDir)
       const response = await runCodex(prompt, reviewDir, { roleId: profile(reviewer).id, tools: [], agentName: reviewer.name, maxTurns: 40, outputSchema: reviewSchema })
       if (response.code !== 0) throw new Error(`No se completó la revisión de Codex: ${(response.err || 'sin diagnóstico').slice(0, 1200)}`)
       const review = parseReview(response.json.result)
-      if (files.some(f => sha(readFileSync(join(reviewDir, f.path))) !== f.hash)) throw new Error('El revisor modificó archivos de la entrega; revisión invalidada.')
+      if (reviewInputs.some(f => sha(readFileSync(join(reviewDir, f.path))) !== f.hash)) throw new Error('El revisor modificó archivos de la entrega o sus referencias; revisión invalidada.')
       reviews.push({ role, reviewerId: reviewer.id, reviewerName: reviewer.name, ...review })
     } catch (error) {
       reviews.push({ role, reviewerId: reviewer.id, reviewerName: reviewer.name, verdict: 'blocked', summary: error.message, evidence: [], issues: [] })

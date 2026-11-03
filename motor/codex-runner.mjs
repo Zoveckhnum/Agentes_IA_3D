@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { createRoleSkillContext } from './role-skills.mjs'
 import { uuid } from './hitl/core.mjs'
+import { join } from 'node:path'
+import { createTokenMeter,loadTokenPolicy } from './token-optimization.mjs'
 
 const rules = readFileSync(new URL('AGENTS.md', import.meta.url), 'utf8')
 const TOOL_ITEMS = new Set(['command_execution', 'mcp_tool_call', 'file_change', 'web_search'])
@@ -18,20 +20,29 @@ export function codexEnvironment(env, agentName, color) {
 }
 
 export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 25 * 60 * 1000 } = {}) {
-  return async function runCodex(prompt, cwd, { tools = ['web_search'], resume, agentName, color, maxTurns = 40, outputSchema, roleId = 'personalizado', signal, taskId = '' } = {}) {
+  const policy=loadTokenPolicy(env.AGENTES_TOKEN_POLICY)
+  const meter=env.AGENTES_STATE_ROOT?createTokenMeter(join(env.AGENTES_STATE_ROOT,'state','tokens'),{policy}):null
+  const runCodex = async function(prompt, cwd, { tools = ['web_search'], resume, agentName, color, maxTurns = 40, outputSchema, roleId = 'personalizado', signal, taskId = '', projectId = '' } = {}) {
     const controller = new AbortController()
     let reason = '', result = '', sessionId = resume || null, usage = null, completed = false
     const toolNames = new Set()
     const approvalRequests = new Map()
+    let reservation=null,settled=false,accounting=null,promptBytes=0
     const timer = setTimeout(() => {
       reason = `Tiempo máximo agotado (${Math.round(timeoutMs / 1000)} s).`
       controller.abort()
     }, timeoutMs)
-    const response = (failed, error = '') => ({
+    const response = (failed, error = '') => {
+      if(reservation&&!settled){
+        settled=true
+        try{accounting=meter.finish(reservation,usage,{failed:!!failed})}
+        catch{failed=true;reason='No se pudo cerrar el registro de tokens; la reserva se conserva para revisión.'}
+      }
+      return ({
       code: failed ? 1 : 0,
-      json: { result: failed ? '' : result, session_id: sessionId, is_error: failed, usage, tools_used: [...toolNames], approval_requests:[...approvalRequests.values()] },
+      json: { result: failed ? '' : result, session_id: sessionId, is_error: failed, usage, tools_used: [...toolNames], approval_requests:[...approvalRequests.values()],token_accounting:accounting,prompt_bytes:promptBytes },
       err: failed ? (reason || error || 'Codex no completó la respuesta.') : '',
-    })
+    })}
     const canWriteProjects = tools.includes('proyectos_integracion')
     const canRegisterProjects = canWriteProjects || tools.includes('proyectos_registro')
     const canReadProjects = canWriteProjects || tools.includes('proyectos_lectura')
@@ -39,6 +50,10 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
     try {
       if (signal?.aborted) return response(true, 'Ejecución cancelada antes de iniciar.')
       const roleContext = createRoleSkillContext(roleId)
+      const fullPrompt=`${rules}\n\n${roleContext.text}\n\n## Encargo concreto\n${prompt}`
+      promptBytes=Buffer.byteLength(fullPrompt)
+      if(promptBytes>policy.maxPromptBytes)throw new Error('El contexto supera el límite de bytes; divide la tarea sin eliminar requisitos.')
+      if(meter)reservation=meter.reserve({taskId,projectId,roleId,promptBytes})
       const codex = new CodexClient({
         ...(env.CODEX_API_KEY || env.OPENAI_API_KEY ? { apiKey: env.CODEX_API_KEY || env.OPENAI_API_KEY } : {}),
         env: codexEnvironment(env, agentName, color),
@@ -78,7 +93,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
         webSearchMode: tools.includes('web_search') ? 'live' : 'disabled',
       }
       const thread = resume ? codex.resumeThread(resume, options) : codex.startThread(options)
-      const stream = await thread.runStreamed(`${rules}\n\n${roleContext.text}\n\n## Encargo concreto\n${prompt}`, { signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal, ...(outputSchema ? { outputSchema } : {}) })
+      const stream = await thread.runStreamed(fullPrompt, { signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal, ...(outputSchema ? { outputSchema } : {}) })
       let calls = 0
       for await (const event of stream.events) {
         if (event.type === 'thread.started') sessionId = event.thread_id
@@ -109,4 +124,6 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
       controller.abort()
     }
   }
+  runCodex.tokenReport=()=>meter?.report()||null
+  return runCodex
 }
