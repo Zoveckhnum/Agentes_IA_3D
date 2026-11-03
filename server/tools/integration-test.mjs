@@ -48,6 +48,12 @@ try {
   check((await call('/api/data/read', { kind: 'collection', path: 'tasks' }, 'owner', { Origin: 'https://untrusted.invalid' })).status, 403)
   const read = (path, who = 'owner') => call('/api/data/read', { kind: 'document', path }, who)
   const commit = (operations, who = 'owner', id = randomUUID(), headers) => call('/api/data/commit', { id, operations }, who, headers)
+  const photoUrl = 'https://example.invalid/avatar.png'
+  check((await commit([{ type: 'update', path: 'agents/agent', data: { photo: photoUrl } }])).status, 200)
+  check((await read('agents/agent')).json.data.photo, photoUrl)
+  const uploadedPhoto = 'data:image/jpeg;base64,/9j/2Q=='
+  check((await commit([{ type: 'update', path: 'agents/agent', data: { photo: uploadedPhoto } }])).status, 200)
+  check((await read('agents/agent')).json.data.photo, uploadedPhoto)
   check((await commit([{ type: 'update', path: 'users/employee', data: { role: 'admin' } }], 'employee')).status, 403)
   check((await read('chats/other_owner/messages/two', 'employee')).status, 403)
   check((await read('chats/employee_other/messages/one', 'employee')).status, 200)

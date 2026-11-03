@@ -117,7 +117,8 @@ configure y autorice su servicio; este cambio no ejecuta las tareas pendientes.
 ## Verificación de esta entrega
 
 - 24 fichas y 35 habilidades; verificación sin red de los 303 archivos fijados.
-- 12 agentes existentes en SQL con roles registrados; se preservan sus documentos.
+- Se preservaron los 12 agentes existentes. A petición posterior del propietario se
+  crearon los 12 faltantes en reserva: ahora hay 24 agentes, uno por cada rol.
 - 3 pruebas del perfil local, 42 del motor y 18 SQL: 63 correctas.
 - Cliente Codex simulado: se comprueba la transmisión de la ficha y el rol del revisor,
   sin llamadas reales al proveedor ni ejecución de tareas de agentes.

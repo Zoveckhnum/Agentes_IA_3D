@@ -1,37 +1,20 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { db } from '../firebase.js'
 import { doc, updateDoc, addDoc, collection, serverTimestamp } from '../data/firestore.js'
 import Icon from './Icons.jsx'
 import LookEditor, { DEFAULT_LOOK } from './LookEditor.jsx'
 import CATALOGO from '../../../roles/catalogo.json'
 import RoleCapabilities from './RoleCapabilities.jsx'
+import { normalizeAgentPhotoUrl, loadAgentPhoto, resizeAgentPhoto } from '../utils/agent-photo.js'
 
 export { STYLES } from './LookEditor.jsx'
 
-// Foto del agente: se recorta cuadrada y se guarda pequeña (JPG 256 px) dentro del documento del agente
-function resizeImage(file, size = 256) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      const side = Math.min(img.width, img.height)
-      const canvas = document.createElement('canvas')
-      canvas.width = canvas.height = size
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size)
-      URL.revokeObjectURL(url)
-      resolve(canvas.toDataURL('image/jpeg', 0.85))
-    }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no válida')) }
-    img.src = url
-  })
-}
-
 // Avatar 2D del agente: su foto, o un círculo con su color e inicial
 export function AgentAvatar({ agent, size = 40 }) {
+  const [failedPhoto, setFailedPhoto] = useState(null)
   const color = agent?.look?.torso || '#4700E0'
-  if (agent?.photo) {
-    return <img src={agent.photo} alt={agent.name} className="agent-avatar" style={{ width: size, height: size }} />
+  if (agent?.photo && failedPhoto !== agent.photo) {
+    return <img src={agent.photo} alt={agent.name} referrerPolicy="no-referrer" onError={() => setFailedPhoto(agent.photo)} className="agent-avatar" style={{ width: size, height: size }} />
   }
   return (
     <span className="agent-avatar" style={{ width: size, height: size, background: color, fontSize: size * 0.42 }}>
@@ -51,7 +34,13 @@ export default function AgentModal({ agent, nextOrder, onClose, showToast, userE
     look: { ...DEFAULT_LOOK, ...(agent?.look || {}) },
   })
   const [saving, setSaving] = useState(false)
+  const [photoLink, setPhotoLink] = useState(agent?.photo?.startsWith('https://') ? agent.photo : '')
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoError, setPhotoError] = useState(null)
+  const [photoNotice, setPhotoNotice] = useState('')
   const fileRef = useRef(null)
+  const photoController = useRef(null)
+  useEffect(() => () => photoController.current?.abort(), [])
 
   // Al elegir un rol se proponen especialidad y misión base (se pueden editar)
   const pickRol = (id) => setForm(f => {
@@ -70,24 +59,50 @@ export default function AgentModal({ agent, nextOrder, onClose, showToast, userE
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('image/')) { showToast('Elige una imagen (JPG, PNG o WebP)', 'error'); return }
+    const controller = new AbortController()
+    photoController.current?.abort()
+    photoController.current = controller
+    setPhotoBusy(true); setPhotoError(null); setPhotoNotice('')
     try {
-      const photo = await resizeImage(file)
+      const photo = await resizeAgentPhoto(file, { signal: controller.signal })
       setForm(f => ({ ...f, photo }))
-    } catch {
-      showToast('No se pudo leer la imagen', 'error')
-    }
+      setPhotoLink(''); setPhotoNotice('Foto preparada. Guarda los cambios para aplicarla.')
+    } catch (error) {
+      if (error.name !== 'AbortError') setPhotoError({ source: 'file', message: error.message })
+    } finally { if (photoController.current === controller) setPhotoBusy(false) }
+  }
+
+  const usePhotoLink = async () => {
+    const controller = new AbortController()
+    photoController.current?.abort()
+    photoController.current = controller
+    setPhotoBusy(true); setPhotoError(null); setPhotoNotice('')
+    try {
+      const photo = normalizeAgentPhotoUrl(photoLink)
+      await loadAgentPhoto(photo, { signal: controller.signal })
+      setForm(f => ({ ...f, photo }))
+      setPhotoLink(photo); setPhotoNotice('Vista previa lista. Guarda los cambios para aplicarla.')
+      return photo
+    } catch (error) {
+      if (error.name !== 'AbortError') setPhotoError({ source: 'link', message: error.message })
+      return null
+    } finally { if (photoController.current === controller) setPhotoBusy(false) }
   }
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.role.trim()) { showToast('Nombre y especialidad son obligatorios', 'error'); return }
     setSaving(true)
+    let photo = form.photo || ''
+    if (photoLink.trim() && photoLink.trim() !== photo) {
+      photo = await usePhotoLink()
+      if (photo === null) { setSaving(false); return }
+    }
     const look = { ...form.look }
     if (!look.emblem) delete look.emblem
     const data = {
       name: form.name.trim(), role: form.role.trim(), bio: form.bio.trim(),
       rol: form.rol || 'personalizado', ...(CATALOGO.roles[form.rol]?.coordinador ? { kind: 'coordinador' } : {}),
-      mission: form.mission.trim(), photo: form.photo || '', look,
+      mission: form.mission.trim(), photo, look,
     }
     try {
       if (agent) {
@@ -112,29 +127,42 @@ export default function AgentModal({ agent, nextOrder, onClose, showToast, userE
 
   return (
     <div className="modal-overlay">
-      <div className="modal" style={{ maxWidth: 540 }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="agent-modal-title" style={{ maxWidth: 540 }}>
         <div className="modal-header">
-          <h2 className="modal-title">{agent ? `Editar: ${agent.name}` : 'Nuevo agente'}</h2>
-          <button className="icon-btn" onClick={onClose}><Icon name="x" size={14} /></button>
+          <h2 id="agent-modal-title" className="modal-title">{agent ? `Editar: ${agent.name}` : 'Nuevo agente'}</h2>
+          <button className="icon-btn" aria-label="Cerrar editor de agente" onClick={onClose}><Icon name="x" size={14} /></button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Foto de perfil */}
           <div className="agent-photo-row">
             <AgentAvatar agent={{ ...form, look: form.look }} size={72} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, flex: 1 }}>
               <span className="form-label" style={{ margin: 0 }}>Foto de perfil</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()}>
+                <button type="button" className="btn btn-secondary btn-sm" disabled={photoBusy || saving} onClick={() => fileRef.current?.click()}>
                   <Icon name="download" size={12} /> {form.photo ? 'Cambiar foto' : 'Subir foto'}
                 </button>
                 {form.photo && (
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm(f => ({ ...f, photo: '' }))}>
+                  <button type="button" className="btn btn-ghost btn-sm" disabled={photoBusy || saving} onClick={() => { setForm(f => ({ ...f, photo: '' })); setPhotoLink(''); setPhotoError(null); setPhotoNotice('Foto quitada. Guarda los cambios para aplicarlo.') }}>
                     Quitar
                   </button>
                 )}
               </div>
-              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Se recorta cuadrada. Se ve en Team, Pipeline y la Oficina.</span>
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickPhoto} />
+              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>JPG, PNG o WebP, hasta 8 MB. El archivo se recorta a una foto cuadrada.</span>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Archivo de foto del agente" hidden onChange={pickPhoto} />
+              <label className="form-label" htmlFor="agent-photo-url" style={{ margin: '4px 0 0' }}>O usa un enlace de imagen</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <input id="agent-photo-url" className="form-input" type="url" inputMode="url" placeholder="https://ejemplo.com/foto.jpg" value={photoLink}
+                  style={{ flex: '1 1 180px', minWidth: 0, minHeight: 44 }} disabled={photoBusy || saving}
+                  aria-invalid={photoError?.source === 'link' ? true : undefined}
+                  aria-describedby={`agent-photo-help${photoError ? ' agent-photo-error' : ''}`}
+                  onChange={e => { setPhotoLink(e.target.value); setPhotoError(null); setPhotoNotice('') }}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); usePhotoLink() } }} />
+                <button type="button" className="btn btn-secondary btn-sm" style={{ minHeight: 44 }} disabled={photoBusy || saving || !photoLink.trim()} onClick={usePhotoLink}>Ver imagen</button>
+              </div>
+              <span id="agent-photo-help" style={{ fontSize: 12, color: 'var(--text-2)' }}>Usa un enlace directo HTTPS a una imagen pública. También puedes pegarlo y pulsar Guardar.</span>
+              {photoError && <span id="agent-photo-error" role="alert" style={{ fontSize: 12, color: 'var(--danger)' }}>{photoError.message}</span>}
+              <span role="status" style={{ fontSize: 12, color: 'var(--text-2)' }}>{photoBusy ? 'Comprobando imagen…' : photoNotice}</span>
             </div>
           </div>
 
@@ -186,7 +214,7 @@ export default function AgentModal({ agent, nextOrder, onClose, showToast, userE
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving || photoBusy}>{saving ? 'Guardando...' : 'Guardar'}</button>
         </div>
       </div>
     </div>
