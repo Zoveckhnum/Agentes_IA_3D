@@ -73,7 +73,7 @@ export async function reviewDelivery({ cwd, task, author, requiredRoles, agents,
         `Solicitud: ${task.tarea}\n${task.descripcion || ''}\nFeedback: ${task.feedback || ''}`,
         `Entregable del autor:\n${result}`,
       ].join('\n\n')
-      const response = await runCodex(prompt, reviewDir, { tools: [], agentName: reviewer.name, maxTurns: 40, outputSchema: reviewSchema })
+      const response = await runCodex(prompt, reviewDir, { roleId: profile(reviewer).id, tools: [], agentName: reviewer.name, maxTurns: 40, outputSchema: reviewSchema })
       if (response.code !== 0) throw new Error(`No se completó la revisión de Codex: ${(response.err || 'sin diagnóstico').slice(0, 1200)}`)
       const review = parseReview(response.json.result)
       if (files.some(f => sha(readFileSync(join(reviewDir, f.path))) !== f.hash)) throw new Error('El revisor modificó archivos de la entrega; revisión invalidada.')

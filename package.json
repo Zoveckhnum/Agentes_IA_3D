@@ -11,6 +11,8 @@
     "emulators": "node tools/emuladores.mjs",
     "seed": "node tools/sembrar-local.mjs",
     "equipo:bi": "node tools/equipo-bi.mjs",
+    "roles:check": "node tools/roles.mjs check",
+    "roles:ver": "node tools/roles.mjs",
     "integraciones:check": "node motor/integraciones-cli.mjs check",
     "drive:login": "node motor/integraciones-cli.mjs drive-login",
     "proyecto": "node motor/integraciones-cli.mjs proyecto",

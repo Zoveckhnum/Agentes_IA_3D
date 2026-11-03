@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param([string]$RepositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,[string]$PublicOrigin='http://127.0.0.1:11090')
 $ErrorActionPreference='Stop'
+& 'C:\Program Files\nodejs\node.exe' (Join-Path $RepositoryRoot 'tools\roles.mjs') check | Out-Null
+if($LASTEXITCODE -ne 0){throw 'Las fichas o los paquetes de habilidades no superan la verificacion'}
 $appRoot='C:\ProgramData\StackBI\Applications\agentes-ia-3d'
 $deploymentPath=Join-Path $appRoot 'deployment.json'
 $deployment=Get-Content -LiteralPath $deploymentPath -Raw | ConvertFrom-Json
@@ -14,7 +16,7 @@ foreach($name in @('src','node_modules')){Copy-Item -LiteralPath (Join-Path $Rep
 foreach($name in @('package.json','package-lock.json')){Copy-Item -LiteralPath (Join-Path $RepositoryRoot ('server\'+$name)) -Destination (Join-Path $newRelease 'server')}
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'deploy\sql-preview') -Destination (Join-Path $newRelease 'public') -Recurse
 $sourceFiles=@()
-foreach($relative in @('server\src','server\migrations','shared','app\src')){
+foreach($relative in @('server\src','server\migrations','shared','app\src','roles\catalogo.json','roles\skills.index.json')){
   foreach($file in Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot $relative) -Recurse -File){$sourceFiles+=($file.FullName.Substring($RepositoryRoot.Length)+':'+(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash)}
 }
 $sourceText=($sourceFiles|Sort-Object)-join "`n"

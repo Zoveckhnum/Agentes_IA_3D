@@ -102,3 +102,24 @@ test('filtra credenciales ajenas y preserva el entorno del sistema', () => {
   const env = codexEnvironment({ PATH: 'bin', USERPROFILE: '/user', FIREBASE_API_KEY: 'x', TELEGRAM_BOT_TOKEN: 'y', CODEX_API_KEY: 'z' }, 'Agente', '#123456')
   assert.deepEqual(env, { PATH: 'bin', USERPROFILE: '/user', AGENTES_AGENTE: 'Agente', AGENTES_COLOR: '#123456' })
 })
+
+test('el rol efectivo llega al modelo con su ficha y solo sus skills asignadas', async () => {
+  const { Client, calls } = fake([message('entrega'), completed])
+  const response = await createCodexRunner({}, { CodexClient: Client })('Construye un formulario', '/trabajo', { tools: [], roleId: 'frontend_portales' })
+  assert.equal(response.code, 0)
+  const prompt = calls.find(c=>c[0]==='run')[1]
+  assert.match(prompt, /frontend_portales/)
+  assert.match(prompt, /vercel-react-best-practices/)
+  assert.match(prompt, /Criterios de aceptación/)
+  assert.match(prompt, /no permisos/)
+  assert.doesNotMatch(prompt, /powershell-windows/)
+  assert.equal(calls.find(c=>c[0]==='start')[1].networkAccessEnabled, false)
+})
+
+test('un rol desconocido falla antes de crear el cliente o ejecutar herramientas', async () => {
+  const { Client, calls } = fake([message('no debe ejecutar'), completed])
+  const response = await createCodexRunner({}, { CodexClient: Client })('tarea', '/trabajo', { roleId: 'sin_registrar' })
+  assert.equal(response.code, 1)
+  assert.equal(calls.length, 0)
+  assert.match(response.err, /no registrado/)
+})

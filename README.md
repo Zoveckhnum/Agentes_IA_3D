@@ -12,6 +12,9 @@ Para la variante preparada con **SQL Server local, API Node e IIS**, consulta
 [Operación SQL local](docs/SQL-LOCAL.md). Está aislada en la rama `feat/sql-local`;
 el arranque con emuladores descrito a continuación corresponde al modo original.
 
+Los [roles y habilidades](docs/ROLES-Y-HABILIDADES.md) tienen fichas por especialidad
+y guías de skills.sh verificadas localmente. Usa `npm run roles:check` para comprobarlas.
+
 Requisitos: **Node.js 22+**, **Java 21+** y acceso a Codex mediante tu cuenta de ChatGPT o una API key.
 Los límites y el costo dependen de tu cuenta; el proyecto tiene licencia MIT.
 

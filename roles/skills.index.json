@@ -1,0 +1,142 @@
+{
+    "create-implementation-plan":  {
+                                       "name":  "create-implementation-plan",
+                                       "url":  "https://skills.sh/github/awesome-copilot/create-implementation-plan"
+                                   },
+    "architecture-blueprint-generator":  {
+                                             "name":  "architecture-blueprint-generator",
+                                             "url":  "https://skills.sh/github/awesome-copilot/architecture-blueprint-generator"
+                                         },
+    "sql-optimization":  {
+                             "name":  "sql-optimization",
+                             "url":  "https://skills.sh/github/awesome-copilot/sql-optimization"
+                         },
+    "sql-code-review":  {
+                            "name":  "sql-code-review",
+                            "url":  "https://skills.sh/github/awesome-copilot/sql-code-review"
+                        },
+    "powerbi-modeling":  {
+                             "name":  "powerbi-modeling",
+                             "url":  "https://skills.sh/github/awesome-copilot/powerbi-modeling"
+                         },
+    "power-bi-dax-optimization":  {
+                                      "name":  "power-bi-dax-optimization",
+                                      "url":  "https://skills.sh/github/awesome-copilot/power-bi-dax-optimization"
+                                  },
+    "power-bi-model-design-review":  {
+                                         "name":  "power-bi-model-design-review",
+                                         "url":  "https://skills.sh/github/awesome-copilot/power-bi-model-design-review"
+                                     },
+    "devops-rollout-plan":  {
+                                "name":  "devops-rollout-plan",
+                                "url":  "https://skills.sh/github/awesome-copilot/devops-rollout-plan"
+                            },
+    "security-review":  {
+                            "name":  "security-review",
+                            "url":  "https://skills.sh/github/awesome-copilot/security-review"
+                        },
+    "project-workflow-analysis-blueprint-generator":  {
+                                                          "name":  "project-workflow-analysis-blueprint-generator",
+                                                          "url":  "https://skills.sh/github/awesome-copilot/project-workflow-analysis-blueprint-generator"
+                                                      },
+    "api-design-principles":  {
+                                  "name":  "api-design-principles",
+                                  "url":  "https://skills.sh/wshobson/agents/api-design-principles"
+                              },
+    "data-quality-frameworks":  {
+                                    "name":  "data-quality-frameworks",
+                                    "url":  "https://skills.sh/wshobson/agents/data-quality-frameworks"
+                                },
+    "llm-evaluation":  {
+                           "name":  "llm-evaluation",
+                           "url":  "https://skills.sh/wshobson/agents/llm-evaluation"
+                       },
+    "workflow-orchestration-patterns":  {
+                                            "name":  "workflow-orchestration-patterns",
+                                            "url":  "https://skills.sh/wshobson/agents/workflow-orchestration-patterns"
+                                        },
+    "code-review-excellence":  {
+                                   "name":  "code-review-excellence",
+                                   "url":  "https://skills.sh/wshobson/agents/code-review-excellence"
+                               },
+    "e2e-testing-patterns":  {
+                                 "name":  "e2e-testing-patterns",
+                                 "url":  "https://skills.sh/wshobson/agents/e2e-testing-patterns"
+                             },
+    "data-storytelling":  {
+                              "name":  "data-storytelling",
+                              "url":  "https://skills.sh/wshobson/agents/data-storytelling"
+                          },
+    "pandas-pro":  {
+                       "name":  "pandas-pro",
+                       "url":  "https://skills.sh/jeffallan/claude-skills/pandas-pro"
+                   },
+    "vercel-react-best-practices":  {
+                                        "name":  "vercel-react-best-practices",
+                                        "url":  "https://skills.sh/vercel-labs/agent-skills/vercel-react-best-practices"
+                                    },
+    "web-design-guidelines":  {
+                                  "name":  "web-design-guidelines",
+                                  "url":  "https://skills.sh/vercel-labs/agent-skills/web-design-guidelines"
+                              },
+    "process-optimization":  {
+                                 "name":  "process-optimization",
+                                 "url":  "https://skills.sh/anthropics/knowledge-work-plugins/process-optimization"
+                             },
+    "statistical-analysis":  {
+                                 "name":  "statistical-analysis",
+                                 "url":  "https://skills.sh/anthropics/knowledge-work-plugins/statistical-analysis"
+                             },
+    "research-synthesis":  {
+                               "name":  "research-synthesis",
+                               "url":  "https://skills.sh/anthropics/knowledge-work-plugins/research-synthesis"
+                           },
+    "task-management":  {
+                            "name":  "task-management",
+                            "url":  "https://skills.sh/anthropics/knowledge-work-plugins/task-management"
+                        },
+    "frontend-design":  {
+                            "name":  "frontend-design",
+                            "url":  "https://skills.sh/anthropics/skills/frontend-design"
+                        },
+    "copywriting":  {
+                        "name":  "copywriting",
+                        "url":  "https://skills.sh/coreyhaines31/marketingskills/copywriting"
+                    },
+    "content-strategy":  {
+                             "name":  "content-strategy",
+                             "url":  "https://skills.sh/coreyhaines31/marketingskills/content-strategy"
+                         },
+    "social":  {
+                   "name":  "social",
+                   "url":  "https://skills.sh/coreyhaines31/marketingskills/social"
+               },
+    "launch":  {
+                   "name":  "launch",
+                   "url":  "https://skills.sh/coreyhaines31/marketingskills/launch"
+               },
+    "seo-audit":  {
+                      "name":  "seo-audit",
+                      "url":  "https://skills.sh/coreyhaines31/marketingskills/seo-audit"
+                  },
+    "image":  {
+                  "name":  "image",
+                  "url":  "https://skills.sh/coreyhaines31/marketingskills/image"
+              },
+    "marketing-plan":  {
+                           "name":  "marketing-plan",
+                           "url":  "https://skills.sh/coreyhaines31/marketingskills/marketing-plan"
+                       },
+    "powershell-windows":  {
+                               "name":  "powershell-windows",
+                               "url":  "https://skills.sh/vudovn/ag-kit/powershell-windows"
+                           },
+    "hyperframes-cli":  {
+                            "name":  "hyperframes-cli",
+                            "url":  "https://skills.sh/heygen-com/hyperframes/hyperframes-cli"
+                        },
+    "hyperframes":  {
+                        "name":  "hyperframes",
+                        "url":  "https://skills.sh/heygen-com/hyperframes/hyperframes"
+                    }
+}

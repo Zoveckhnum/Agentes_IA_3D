@@ -4,6 +4,7 @@ import { doc, updateDoc, addDoc, collection, serverTimestamp } from '../data/fir
 import Icon from './Icons.jsx'
 import LookEditor, { DEFAULT_LOOK } from './LookEditor.jsx'
 import CATALOGO from '../../../roles/catalogo.json'
+import RoleCapabilities from './RoleCapabilities.jsx'
 
 export { STYLES } from './LookEditor.jsx'
 
@@ -172,8 +173,11 @@ export default function AgentModal({ agent, nextOrder, onClose, showToast, userE
               onChange={e => setForm(f => ({ ...f, mission: e.target.value }))}
               placeholder="Qué hace este agente, qué tono usa, qué entrega..." />
             <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-              Es lo que el agente lee antes de cada tarea: define cómo trabaja y qué entrega.
+              Concreta el trabajo de este agente sin sustituir las actividades ni los límites de su rol.
             </span>
+          </div>
+          <div className="form-group">
+            <RoleCapabilities role={CATALOGO.roles[form.rol || 'personalizado']} />
           </div>
           <div className="form-group">
             <label className="form-label">Personaje en la Oficina 3D</label>

@@ -1,6 +1,7 @@
 import { Codex } from '@openai/codex-sdk'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { createRoleSkillContext } from './role-skills.mjs'
 
 const rules = readFileSync(new URL('AGENTS.md', import.meta.url), 'utf8')
 const TOOL_ITEMS = new Set(['command_execution', 'mcp_tool_call', 'file_change', 'web_search'])
@@ -15,7 +16,7 @@ export function codexEnvironment(env, agentName, color) {
 }
 
 export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 25 * 60 * 1000 } = {}) {
-  return async function runCodex(prompt, cwd, { tools = ['web_search'], resume, agentName, color, maxTurns = 40, outputSchema } = {}) {
+  return async function runCodex(prompt, cwd, { tools = ['web_search'], resume, agentName, color, maxTurns = 40, outputSchema, roleId = 'personalizado' } = {}) {
     const controller = new AbortController()
     let reason = '', result = '', sessionId = resume || null, usage = null, completed = false
     const toolNames = new Set()
@@ -32,6 +33,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
     const canRegisterProjects = canWriteProjects || tools.includes('proyectos_registro')
     const canReadProjects = canWriteProjects || tools.includes('proyectos_lectura')
     try {
+      const roleContext = createRoleSkillContext(roleId)
       const codex = new CodexClient({
         ...(env.CODEX_API_KEY || env.OPENAI_API_KEY ? { apiKey: env.CODEX_API_KEY || env.OPENAI_API_KEY } : {}),
         env: codexEnvironment(env, agentName, color),
@@ -65,7 +67,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
         webSearchMode: tools.includes('web_search') ? 'live' : 'disabled',
       }
       const thread = resume ? codex.resumeThread(resume, options) : codex.startThread(options)
-      const stream = await thread.runStreamed(`${rules}\n\n${prompt}`, { signal: controller.signal, ...(outputSchema ? { outputSchema } : {}) })
+      const stream = await thread.runStreamed(`${rules}\n\n${roleContext.text}\n\n## Encargo concreto\n${prompt}`, { signal: controller.signal, ...(outputSchema ? { outputSchema } : {}) })
       let calls = 0
       for await (const event of stream.events) {
         if (event.type === 'thread.started') sessionId = event.thread_id

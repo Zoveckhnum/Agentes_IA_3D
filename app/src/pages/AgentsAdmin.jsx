@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import CATALOGO from '../../../roles/catalogo.json'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
 import { doc, updateDoc, deleteDoc } from '../data/firestore.js'
@@ -86,6 +87,9 @@ export default function AgentsAdmin() {
                   <span className={`agent-pill ${on ? 'on' : ''}`}>{on ? 'Activo' : 'En reserva'}</span>
                 </div>
                 <p className="agent-card-bio">{a.bio || <span style={{ color: 'var(--text-3)' }}>Sin descripción corta</span>}</p>
+                <p style={{ fontSize: 11, color: 'var(--text-3)' }}>
+                  Perfil: {CATALOGO.roles[a.rol || 'personalizado']?.nombre || 'Personalizado'} · {CATALOGO.roles[a.rol || 'personalizado']?.skills?.length || 0} habilidades
+                </p>
                 <div className="agent-card-stats">
                   <span><b>{s.abiertas}</b> abiertas</span>
                   <span><b>{s.espera}</b> por aprobar</span>
