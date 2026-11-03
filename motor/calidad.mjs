@@ -4,6 +4,10 @@ import { createHash, randomUUID } from 'node:crypto'
 
 const sha = data => createHash('sha256').update(data).digest('hex')
 const OMIT = new Set(['node_modules', '.git', '.qa', '__pycache__', '.venv', 'venv'])
+export function requiredReviewRoles(profile, project = false) {
+  if (profile.qualityReviewer) return []
+  return profile.qualityReviewers?.length ? profile.qualityReviewers : project ? ['qa_software'] : []
+}
 export function snapshotFiles(cwd, extraOmit = new Set()) {
   const files = []
   let bytes = 0
@@ -39,14 +43,19 @@ export function parseReview(text) {
   if (v.verdict === 'passed' && (!v.evidence.some(x => x.trim()) || v.issues.length)) throw new Error('QA no puede aprobar sin evidencia o con incidencias abiertas.')
   return v
 }
-export async function reviewDelivery({ cwd, task, author, requiredRoles, agents, profile, runCodex, result }) {
-  if (!requiredRoles?.length) return {}
+export async function reviewDelivery({ cwd, task, author, requiredRoles, agents, profile, runCodex, result, reportOnly = false, reportBaseline }) {
+  if (!requiredRoles?.length && !reportOnly) return {}
   const reviews = []
   let files
   try { files = snapshotFiles(cwd) }
   catch (error) { return { qualityStatus: 'blocked', qualityReviews: [{ summary: error.message, verdict: 'blocked' }] } }
   const manifest = files.map(({ path, hash }) => ({ path, hash }))
   const revision = sha(JSON.stringify({ result, manifest }))
+  if (reportOnly) {
+    const changed = reportBaseline && JSON.stringify(reportBaseline) !== JSON.stringify(manifest)
+    return { qualityReport: true, qualityStatus: changed ? 'blocked' : 'report', qualityRevision: revision, qualityManifest: manifest, qualityCheckedAt: new Date().toISOString(),
+      qualityReviews: changed ? [{ verdict: 'blocked', summary: 'El agente de QA modificó el producto durante su informe. Se requiere revisión independiente.', evidence: [], issues: [] }] : [] }
+  }
   for (const role of requiredRoles) {
     const reviewer = agents.find(a => a.id !== author.id && a.active !== false && profile(a).id === role && profile(a).qualityReviewer)
     if (!reviewer) { reviews.push({ role, verdict: 'blocked', summary: 'No hay un revisor independiente activo para este rol.', evidence: [], issues: [] }); continue }

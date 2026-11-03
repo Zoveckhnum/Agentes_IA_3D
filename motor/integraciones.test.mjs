@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { safeFile, githubClient } from './integraciones.mjs'
 import { acceptsMessage } from './telegram.mjs'
-import { parseReview, reviewDelivery } from './calidad.mjs'
+import { parseReview, reviewDelivery, requiredReviewRoles } from './calidad.mjs'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { fileURLToPath } from 'node:url'
@@ -35,6 +35,27 @@ test('QA no aprueba respuestas inválidas ni auto revisión', async () => {
   const result = await reviewDelivery({ cwd, task: {}, author, requiredRoles: ['qa'], agents: [author], profile: () => ({ id: 'qa', qualityReviewer: true }), runCodex: () => { throw new Error('No debe ejecutarse') }, result: 'Entrega' })
   assert.equal(result.qualityStatus, 'blocked')
 })
+
+test('un informe de QA no exige otro revisor de QA; el producto mantiene la revisión independiente', () => {
+  assert.deepEqual(requiredReviewRoles({ qualityReviewer: true, qualityReviewers: [] }, true), [])
+  assert.deepEqual(requiredReviewRoles({}, true), ['qa_software'])
+  assert.deepEqual(requiredReviewRoles({ qualityReviewers: ['qa_datos'] }, true), ['qa_datos'])
+})
+
+test('un informe emitido no aprueba código y queda bloqueado si QA modifica el producto', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'agentes-informe-'))
+  writeFileSync(join(cwd, 'README.md'), 'Original')
+  const { snapshotFiles } = await import('./calidad.mjs')
+  const reportBaseline = snapshotFiles(cwd).map(({ path, hash }) => ({ path, hash }))
+  const args = { cwd, reportOnly: true, reportBaseline, requiredRoles: [], result: 'Criterios y comprobaciones', runCodex: () => { throw new Error('No se debe revisar al revisor') } }
+  const report = await reviewDelivery(args)
+  assert.equal(report.qualityStatus, 'report')
+  assert.equal(report.qualityReport, true)
+  assert.notEqual(report.qualityStatus, 'passed')
+  writeFileSync(join(cwd, 'README.md'), 'Modificado por QA')
+  const altered = await reviewDelivery(args)
+  assert.equal(altered.qualityStatus, 'blocked')
+})
 test('QA detecta cambios del revisor y conserva evidencias independientes', async () => {
   const cwd = mkdtempSync(join(tmpdir(), 'agentes-qa-'))
   writeFileSync(join(cwd, 'entrega.txt'), 'original')
@@ -62,5 +83,30 @@ test('servidor MCP de revisión no expone herramientas de escritura', async () =
     const result = await client.callTool({ name: 'listar_proyectos', arguments: {} })
     assert.equal(result.isError, undefined)
     assert.ok(result.content[0].text)
+  } finally { await client.close() }
+})
+
+test('servidor MCP de escritura ofrece registro local sin operaciones de producción', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'agentes-mcp-'))
+  const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('proyectos-mcp.mjs', import.meta.url)), cwd, 'write'], stderr: 'pipe' })
+  const client = new Client({ name: 'test', version: '1' })
+  try {
+    await client.connect(transport)
+    const { tools } = await client.listTools()
+    assert.deepEqual(tools.map(t => t.name).sort(), ['drive_guardar', 'drive_listar', 'github_borrador', 'github_leer', 'listar_proyectos', 'registrar_proyecto'])
+    const register = tools.find(t => t.name === 'registrar_proyecto')
+    assert.equal(register.annotations.readOnlyHint, false)
+    assert.equal(register.annotations.openWorldHint, false)
+  } finally { await client.close() }
+})
+
+test('coordinador con permiso de registro no recibe herramientas de escritura remota', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'agentes-mcp-'))
+  const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('proyectos-mcp.mjs', import.meta.url)), cwd, 'register'], stderr: 'pipe' })
+  const client = new Client({ name: 'test', version: '1' })
+  try {
+    await client.connect(transport)
+    const { tools } = await client.listTools()
+    assert.deepEqual(tools.map(t => t.name).sort(), ['listar_proyectos', 'registrar_proyecto'])
   } finally { await client.close() }
 })

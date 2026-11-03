@@ -28,25 +28,30 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
       json: { result: failed ? '' : result, session_id: sessionId, is_error: failed, usage, tools_used: [...toolNames] },
       err: failed ? (reason || error || 'Codex no completó la respuesta.') : '',
     })
+    const canWriteProjects = tools.includes('proyectos_integracion')
+    const canRegisterProjects = canWriteProjects || tools.includes('proyectos_registro')
+    const canReadProjects = canWriteProjects || tools.includes('proyectos_lectura')
     try {
       const codex = new CodexClient({
         ...(env.CODEX_API_KEY || env.OPENAI_API_KEY ? { apiKey: env.CODEX_API_KEY || env.OPENAI_API_KEY } : {}),
         env: codexEnvironment(env, agentName, color),
-        ...(tools.some(t => ['proyectos_integracion', 'proyectos_lectura'].includes(t)) ? {
+        ...(canRegisterProjects || canReadProjects ? {
           config: { mcp_servers: { proyectos: {
             command: process.execPath,
-            args: [fileURLToPath(new URL('proyectos-mcp.mjs', import.meta.url)), cwd, tools.includes('proyectos_integracion') ? 'write' : 'read'],
+            args: [fileURLToPath(new URL('proyectos-mcp.mjs', import.meta.url)), cwd, canWriteProjects ? 'write' : canRegisterProjects ? (canReadProjects ? 'register-read' : 'register') : 'read'],
             startup_timeout_sec: 20,
             tool_timeout_sec: 180,
-            enabled_tools: ['listar_proyectos', 'github_leer', 'drive_listar',
-              ...(tools.includes('proyectos_integracion') ? ['github_borrador', 'drive_guardar'] : [])],
-            // Consentimiento persistente del propietario; no amplía los permisos del rol.
-            ...(env.PROJECTS_ALLOW_DRAFT_WRITES === 'true' && tools.includes('proyectos_integracion') ? {
-              tools: {
+            enabled_tools: ['listar_proyectos', ...(canReadProjects ? ['github_leer', 'drive_listar'] : []),
+              ...(canRegisterProjects ? ['registrar_proyecto'] : []), ...(canWriteProjects ? ['github_borrador', 'drive_guardar'] : [])],
+            ...(canRegisterProjects ? { tools: {
+              // Registro local reversible. El destino debe proceder de la solicitud del dueño.
+              registrar_proyecto: { approval_mode: 'approve' },
+              // El consentimiento para borradores no amplía los permisos del rol.
+              ...(canWriteProjects && env.PROJECTS_ALLOW_DRAFT_WRITES === 'true' ? {
                 github_borrador: { approval_mode: 'approve' },
                 drive_guardar: { approval_mode: 'approve' },
-              },
-            } : {}),
+              } : {}),
+            } } : {}),
           } } },
         } : {}),
       })
