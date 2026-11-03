@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { readPlan,sha256,canonical,readJson,checkedPath } from './core.mjs'
+import { readPlan,sha256,canonical,readJson,checkedPath,atomicJson } from './core.mjs'
 import { verifyArtifact,extractArtifact } from '../../deploy/cicd/artifact.mjs'
 
 const production='C:\\ProgramData\\StackBI\\Applications\\agentes-ia-3d\\deployment.json'
@@ -46,6 +46,7 @@ export async function executePlan(verified,{root,env=process.env,fetchImpl=fetch
     const expected=await readFile(join(work,'deploy/sql-preview/index.html'),'utf8')
     const page=await fetchImpl('http://127.0.0.1:10011/',{signal:AbortSignal.timeout(10000)})
     if(!page.ok||await page.text()!==expected)throw new Error('Published frontend differs from approved artifact')
+    atomicJson(production,{...deployment,ciCommit:plan.target.commit,ciRunId:plan.target.runId,artifactSHA256:plan.payload.sha256,humanPlanId:plan.id})
     return {ok:true,kind:plan.kind,commit:plan.target.commit,release:deployment.release}
   }
   if(plan.kind==='sql-schema'){
