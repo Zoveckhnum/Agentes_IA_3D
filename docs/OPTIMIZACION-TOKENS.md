@@ -110,3 +110,21 @@ arnés. No se afirma la reducción de 60–95% citada en `Recomendaciones.md`.
 Los porcentajes de bytes en pruebas sintéticas no son porcentajes de ahorro real
 de tokens, tiempo o dinero. El [SDK oficial](https://learn.chatgpt.com/docs/codex-sdk)
 y los tipos de la versión instalada sustentan la contabilización usada aquí.
+
+## Verificación operativa
+
+El 3 de noviembre de 2026 pasaron 102 pruebas locales, incluidas reservas tras
+reinicios, límites por proyecto/tarea, subconjuntos de caché, referencias alteradas,
+aislamiento del lector y bloqueo de QA ante modificaciones de su referencia.
+
+Una prueba sintética bajo `NT SERVICE\StackBI-AgentMotor` recuperó correctamente
+`TOKENS_OK`, oculto en el centro de una referencia de 75,619 bytes. La referencia
+inline ocupó 1,839 bytes; el original permaneció completo. Codex reportó 44,884
+tokens de entrada, 39,424 de ellos en caché, y 130 de salida. El registro contabilizó
+45,014 tokens, sin duplicar los de caché. Son resultados de una muestra; no una
+comparación equivalente antes/después ni una estimación de ahorro de producción.
+
+El registro de prueba está separado del productivo. Tras la comprobación se
+restauró el daemon normal, con los límites predeterminados activos y el corte
+original de tareas nuevas. Los hashes de los 24 agentes y diez tareas de producción
+permanecieron iguales. La aplicación IIS y el esquema SQL no se modificaron.
