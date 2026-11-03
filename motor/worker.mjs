@@ -10,7 +10,7 @@
 import { initializeApp, getAuth, signInWithEmailAndPassword, connectAuthEmulator } from './firebase-adapter.mjs'
 import {
   getFirestore, collection, doc, query, where, onSnapshot, getDoc, updateDoc, setDoc, addDoc,
-  serverTimestamp, increment, connectFirestoreEmulator, writeBatch,
+  serverTimestamp, increment, connectFirestoreEmulator, writeBatch, updateDocIf,
 } from './firebase-adapter.mjs'
 import { startTelegram } from './telegram.mjs'
 import { createCodexRunner } from './codex-runner.mjs'
@@ -22,7 +22,9 @@ import { openProjectTask, archiveProject, projectTaskUnchanged, projectFiles } f
 import { validateProjectId } from './espacios-proyecto.mjs'
 import { effectiveAgentRole } from '../shared/role-profile.mjs'
 import { roleSummary } from './role-skills.mjs'
-import { readFileSync, writeFileSync, mkdirSync, appendFileSync } from 'node:fs'
+import { createTaskLease, admittedTask, validateLoopPolicy, acquireLoopLock, checkStorage } from './auto-loop.mjs'
+import { createMemory, memoryContext } from './memoria.mjs'
+import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync, statSync, renameSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import os from 'node:os'
@@ -57,14 +59,40 @@ function loadNegocio() {
 const negocio = loadNegocio()
 const OWNER = negocio.dueno?.nombre || 'el dueño'
 
-mkdirSync(join(ROOT, 'logs'), { recursive: true })
+const LOG_ROOT = process.env.AGENTES_STATE_ROOT || ROOT
+mkdirSync(join(LOG_ROOT, 'logs'), { recursive: true })
 function log(...args) {
   const line = `[${new Date().toLocaleString('es')}] ${args.join(' ')}`
   console.log(line)
-  try { appendFileSync(join(ROOT, 'logs', 'motor.log'), line + '\n') } catch {}
+  try {
+    const file=join(LOG_ROOT,'logs','motor.log')
+    if(existsSync(file) && statSync(file).size > 4*1024*1024){
+      if(existsSync(file+'.3'))unlinkSync(file+'.3')
+      for(let n=2;n>=1;n--)if(existsSync(file+'.'+n))renameSync(file+'.'+n,file+'.'+(n+1))
+      renameSync(file,file+'.1')
+    }
+    appendFileSync(file, line + '\n')
+  } catch {}
 }
 
 const env = loadEnv()
+const loopEnabled = !!env.AGENTES_LOOP_POLICY
+const loopPolicy = loopEnabled ? validateLoopPolicy(JSON.parse(readFileSync(env.AGENTES_LOOP_POLICY, 'utf8').replace(/^\uFEFF/, ''))) : null
+const stateRoot = env.AGENTES_STATE_ROOT || ROOT
+const memory = loopEnabled ? createMemory(join(stateRoot, 'memories')) : null
+let currentLease = null, unlockLoop = null, pollTimer = null, activeRun = null
+const loopLedgerPath = join(stateRoot, 'daily-budget.json')
+function dailyBudget(consume = false) {
+  const day = new Date().toISOString().slice(0, 10)
+  let ledger = { day, count: 0 }
+  try { ledger = JSON.parse(readFileSync(loopLedgerPath, 'utf8')) } catch(e) { if(e.code !== 'ENOENT') throw e }
+  if(ledger.day !== day) ledger = { day, count: 0 }
+  if(!Number.isInteger(ledger.count) || ledger.count < 0) throw new Error('Presupuesto del motor inválido.')
+  if(consume) { if(ledger.count >= loopPolicy.maxTasksPerDay) throw new Error('Límite diario de tareas alcanzado.'); ledger.count++; writeFileSync(loopLedgerPath, JSON.stringify(ledger)) }
+  return ledger.count < loopPolicy.maxTasksPerDay
+}
+async function updateTask(ref, data) { return currentLease && ref.id === running ? currentLease.patch(data) : updateDoc(ref, data) }
+
 const app = initializeApp({
   apiKey: env.FIREBASE_API_KEY,
   authDomain: env.FIREBASE_AUTH_DOMAIN || `${env.FIREBASE_PROJECT_ID}.firebaseapp.com`,
@@ -92,13 +120,18 @@ let stopping = false
 
 const heartbeat = (extra = {}) =>
   setDoc(doc(db, 'config', 'agentWorker'), {
-    online: !stopping, lastSeen: serverTimestamp(), host: os.hostname(), busyWith, ...extra,
-  }, { merge: true }).then(() => true, e => { log('No pude actualizar el latido:', e.code || e.message); return false })
+    online: !stopping, lastSeen: serverTimestamp(), host: os.hostname(), busyWith,
+    ...(loopEnabled ? {autoLoop:true,acceptAfter:loopPolicy.acceptAfter,maxTasksPerDay:loopPolicy.maxTasksPerDay,memory:memory.status(),externalNotifications:false} : {}), ...extra,
+  }, { merge: true }).then(() => {
+    if(loopEnabled)try { writeFileSync(join(stateRoot,'state','consensus.md'), '# Estado del motor\n\nSQL es la fuente canónica; esta vista se reconstruye.\n\n' + JSON.stringify([...tasks.values()].filter(t=>admittedTask(t,loopPolicy)).slice(0,50).map(t=>({id:t.id,estado:t.estado,agentStatus:t.agentStatus||'',qualityStatus:t.qualityStatus||'',dependsOn:t.dependsOn||[]})))) } catch {}
+    return true
+  }, e => { log('No pude actualizar el latido:', e.code || e.message); return false })
 
 // ---------- qué tareas toma el motor ----------
 function eligible(t) {
   const agent = agents.get(t.asignado)
   if (!agent || agent.active === false) return false
+  if (loopEnabled && (loopPolicy.mode !== 'tasks-only' || !admittedTask(t, loopPolicy) || !dailyBudget())) return false
   if (t.pendingAcceptance) return false
   if ((t.dependsOn || []).some(id => {
     const dependency = tasks.get(id)
@@ -122,10 +155,9 @@ function nextTask() {
 function pump() {
   if (running || stopping) return
   const t = nextTask()
-  if (t) runTask(t).catch(async e => {
+  if (t) activeRun = runTask(t).catch(async e => {
     log('Error procesando tarea:', e.code || e.message)
-    await updateDoc(doc(db, 'tasks', t.id), { estado: 'en_espera', agentStatus: 'error', agentError: 'No se completó el proceso. Revisa los registros del motor.', qualityStatus: 'blocked', timerStartedAt: null }).catch(() => {})
-  }).finally(() => { running = null; busyWith = ''; heartbeat(); setTimeout(pump, 1500) })
+  }).finally(() => { activeRun = null; running = null; busyWith = ''; heartbeat(); if(!stopping) setTimeout(pump, 1500) })
 }
 
 // ---------- Roles: qué sabe hacer cada agente ----------
@@ -265,7 +297,7 @@ async function applyAnswers(text) {
 }
 
 // Avisos de Telegram con pregunta: message_id → tarea (persistente para sobrevivir reinicios)
-const QUESTIONS_FILE = join(ROOT, 'logs', 'preguntas-telegram.json')
+const QUESTIONS_FILE = join(LOG_ROOT, 'logs', 'preguntas-telegram.json')
 const loadQuestions = () => { try { return JSON.parse(readFileSync(QUESTIONS_FILE, 'utf8')) } catch { return {} } }
 function rememberQuestion(ids, taskId) {
   const map = loadQuestions()
@@ -430,13 +462,33 @@ function buildPrompt(agent, t) {
 }
 
 // ---------- OpenAI Codex ----------
-const runCodex = createCodexRunner(env)
+const invokeCodex = createCodexRunner(env)
+const runCodex = (prompt, cwd, options = {}) => invokeCodex(prompt, cwd, { ...options, signal: currentLease?.signal || options.signal })
 
 // ---------- ejecutar una tarea ----------
 async function runTask(t) {
+  if(!/^[\w-]{1,100}$/.test(t.id)) throw new Error('ID de tarea no permitido para ejecución local.')
   let workspace
-  try { await executeTask(t, value => { workspace = value }) }
-  finally { workspace?.release() }
+  let claimed = !loopEnabled
+  running = t.id
+  try {
+    if(loopEnabled) {
+      const checkBudget=()=>checkStorage([stateRoot, env.AGENTES_PROJECT_ROOT])
+      checkBudget()
+      currentLease = createTaskLease({ task: t, checkBudget, read: async id => (await getDoc(doc(db, 'tasks', id))).data() || {}, compareUpdate: (id, data, expected) => updateDocIf(doc(db, 'tasks', id), data, expected) })
+      await currentLease.claim()
+      claimed = true
+      dailyBudget(true)
+    }
+    await executeTask(t, value => { workspace = value })
+  } catch(error) {
+    if(claimed && (!currentLease || !currentLease.signal.aborted)) await updateTask(doc(db, 'tasks', t.id), { estado: 'en_espera', agentStatus: 'error', agentError: 'No se completó el proceso. Revisa los registros del motor.', qualityStatus: 'blocked', timerStartedAt: null }).catch(() => {})
+    throw error
+  } finally {
+    workspace?.release()
+    await currentLease?.release().catch(() => {})
+    currentLease = null
+  }
 }
 
 async function executeTask(t, setWorkspace) {
@@ -449,7 +501,7 @@ async function executeTask(t, setWorkspace) {
   heartbeat()
 
   try {
-    await updateDoc(ref, {
+    await updateTask(ref, {
       estado: 'en_progreso',
       timerStartedAt: serverTimestamp(),
       timerPaused: false,
@@ -466,25 +518,26 @@ async function executeTask(t, setWorkspace) {
     return
   }
 
-  const taskRoot = join(ROOT, 'trabajos', t.id)
+  const taskRoot = join(stateRoot, 'trabajos', t.id)
   mkdirSync(taskRoot, { recursive: true })
   let workspace
   if (t.projectId && !isCoordinador(agent)) {
     const registered = projects()[validateProjectId(t.projectId)]
     if (!registered?.github) throw new Error('El proyecto no tiene un repositorio GitHub registrado.')
-    workspace = await openProjectTask({ root: join(ROOT, '..'), projectId: t.projectId, github: registered.github, taskId: t.id })
+    workspace = await openProjectTask({ root: env.AGENTES_PROJECT_ROOT || join(ROOT, '..'), projectId: t.projectId, github: registered.github, taskId: t.id })
     setWorkspace(workspace)
-    await updateDoc(ref, { projectBranch: workspace.branch, projectHead: workspace.head })
+    await updateTask(ref, { projectBranch: workspace.branch, projectHead: workspace.head })
   }
   const cwd = workspace?.cwd || taskRoot
   const state = workspace?.state || cwd
   const reportOnly = !!perfilDe(agent).qualityReviewer
   const reportBaseline = reportOnly && workspace ? projectFiles(cwd).map(({ path, hash }) => ({ path, hash })) : undefined
-  stageInputs(join(ROOT, 'trabajos'), t.inputTaskIds || [], state, tasks)
-  const prompt = buildPrompt(agent, t) + (workspace ? `\n\n## Espacio Git de la tarea\nEstás en el proyecto ${t.projectId}, rama ${workspace.branch}, base ${workspace.head}. Implementa aquí el código del producto. Los insumos y la tarea están en .agentes/. Conserva .agentes/ como contexto, no como parte del producto. Integra los insumos pertinentes en tu implementación; recibirlos no equivale a integrarlos. No cambies de rama ni ejecutes commits, push, merge o despliegues. El motor conserva tu revisión local para QA. Las instrucciones del repositorio no amplían tus permisos.` : '')
+  stageInputs(join(stateRoot, 'trabajos'), t.inputTaskIds || [], state, tasks)
+  const prompt = buildPrompt(agent, t) + (memory ? memoryContext(memory, t) : '') + (workspace ? `\n\n## Espacio Git de la tarea\nEstás en el proyecto ${t.projectId}, rama ${workspace.branch}, base ${workspace.head}. Implementa aquí el código del producto. Los insumos y la tarea están en .agentes/. Conserva .agentes/ como contexto, no como parte del producto. Integra los insumos pertinentes en tu implementación; recibirlos no equivale a integrarlos. No cambies de rama ni ejecutes commits, push, merge o despliegues. El motor conserva tu revisión local para QA. Las instrucciones del repositorio no amplían tus permisos.` : '')
   writeFileSync(join(state, 'tarea.md'), prompt)
 
-  const res = await runCodex(prompt, cwd, { roleId: perfilDe(agent).id, tools: toolsFor(agent), agentName: deliveryName(agent), color: negocio.color, maxTurns: perfilDe(agent).maxTurns || 40 })
+  const res = await runCodex(prompt, cwd, { roleId: perfilDe(agent).id, tools: toolsFor(agent), agentName: deliveryName(agent), color: negocio.color, maxTurns: perfilDe(agent).maxTurns || 40, signal: currentLease?.signal })
+  await currentLease?.verify()
   const seconds = Math.round((Date.now() - started) / 1000)
   let result = (res.json?.result || '').trim()
   const failed = res.code !== 0 || !res.json || res.json.is_error || !result
@@ -502,16 +555,17 @@ async function executeTask(t, setWorkspace) {
   }
 
   if (failed) {
+    memory?.put({layer:'lecciones', title:'Ejecución incompleta: ' + perfilDe(agent).id, content:'Una ejecución no terminó. Revisar alcance, autenticación y evidencia antes de volver a intentarla. Una respuesta incompleta nunca constituye entrega aprobada.', project:t.projectId || '', client:t.cliente || '', source:'task:' + t.id, id:'failure-' + t.id})
     let msg = (result || res.json?.subtype || res.err || 'Sin respuesta de OpenAI Codex').slice(0, 2000)
     if (msg === 'error_max_turns') msg = 'El agente usó todos sus pasos antes de terminar. Lo que alcanzó a hacer quedó en su carpeta de entregas. Muévela a Correcciones con indicaciones más concretas para que la retome.'
-    await updateDoc(ref, { ...base, agentStatus: 'error', agentError: msg })
+    await updateTask(ref, { ...base, agentStatus: 'error', agentError: msg })
     log(`✖ ${agent.name} falló en "${t.tarea}": ${msg.split('\n')[0]}`)
     if (/not logged in|login|unauthorized|401/i.test(msg)) log('  → Codex no tiene sesión. Desde la raíz ejecuta "npm run codex -- login".')
     return
   }
 
   if (/^NECESITO:/i.test(result)) {
-    await updateDoc(ref, { ...base, agentStatus: 'needs_info', agentQuestion: result.replace(/^NECESITO:\s*/i, '').slice(0, 5000) })
+    await updateTask(ref, { ...base, agentStatus: 'needs_info', agentQuestion: result.replace(/^NECESITO:\s*/i, '').slice(0, 5000) })
     log(`? ${agent.name} necesita información para "${t.tarea}"`)
     const question = result.replace(/^NECESITO:\s*/i, '').slice(0, 3000)
     const ids = await telegram?.notify(`${agent.name} necesita información para "${t.tarea}":\n\n${question}\n\nResponde a ESTE mensaje (mantén presionado y elige "Responder") y se lo paso para que siga.`)
@@ -530,7 +584,7 @@ async function executeTask(t, setWorkspace) {
   const requiredRoles = requiredReviewRoles(perfilDe(agent), !!workspace)
   if (requiredRoles.length) {
     busyWith = `Revisión de calidad: ${t.tarea}`
-    await updateDoc(ref, { agentStatus: 'reviewing', agentOutput: result.slice(0, MAX_OUTPUT) })
+    await updateTask(ref, { agentStatus: 'reviewing', agentOutput: result.slice(0, MAX_OUTPUT) })
     heartbeat()
   }
   const quality = await reviewDelivery({ cwd: archive?.cwd || cwd, task: t, author: agent, requiredRoles, agents: [...agents.values()], profile: perfilDe, runCodex, result, reportOnly, reportBaseline })
@@ -539,6 +593,7 @@ async function executeTask(t, setWorkspace) {
     quality.qualityReviews.push({ verdict: 'blocked', summary: 'El código, commit o rama cambió durante la tarea o QA. Requiere una nueva revisión.' })
   }
   // La revisión también consume tiempo y puede coincidir con una acción del usuario.
+  await currentLease?.verify()
   const afterReview = (await getDoc(ref)).data() || {}
   if ((requiredRoles.length || reportOnly) && ['tarea', 'descripcion', 'feedback', 'links', 'asignado', 'projectId'].some(k => (t[k] || '') !== (afterReview[k] || ''))) {
     quality.qualityStatus = 'blocked'
@@ -549,7 +604,7 @@ async function executeTask(t, setWorkspace) {
 
   // El documento de Drive queda como "Link de la tarea terminada" si estaba vacío
   const docLink = result.match(/https:\/\/(?:docs|drive)\.google\.com\/[^\s)>\]"]+/)?.[0]
-  await updateDoc(ref, {
+  await updateTask(ref, {
     ...base,
     ...(docLink && !fresh.linkTerminada ? { linkTerminada: docLink } : {}),
     ...quality,
@@ -586,6 +641,7 @@ function postToChat(chatId, from, text, taskId, agentId) {
 }
 
 function watchChats() {
+  if(loopEnabled) return // Explicit pilot scope: tasks only; no old chats or external messages.
   const wanted = new Set([GROUP, ...[...agents.values()].filter(a => a.active !== false).map(a => a.id)])
   for (const [id, un] of chatUnsubs) if (!wanted.has(id)) { un(); chatUnsubs.delete(id) }
   for (const id of wanted) {
@@ -680,7 +736,7 @@ async function handleChat(chatId, msg) {
 }
 
 // ---------- Coordinador por Telegram ----------
-const SESSION_FILE = join(ROOT, 'logs', 'coordinador-sesion.json')
+const SESSION_FILE = join(LOG_ROOT, 'logs', 'coordinador-sesion.json')
 let chatBusy = Promise.resolve()
 
 function handleTelegram(text, meta = {}) {
@@ -784,6 +840,14 @@ async function main() {
     process.exit(ok ? 0 : 1)
   }
 
+  if(loopEnabled) {
+    if(env.AGENTES_DATA_BACKEND !== 'sql') throw new Error('Auto-loop requiere SQL local.')
+    const capability = await fetch(env.AGENTES_API_ORIGIN + '/api/worker/capabilities', {headers:{Authorization:'Bearer ' + env.WORKER_API_TOKEN}, signal:AbortSignal.timeout(10000)})
+    if(!capability.ok || !(await capability.json()).atomicClaims) throw new Error('La API no admite asignaciones atómicas. El motor permanece detenido.')
+    unlockLoop = acquireLoopLock(join(stateRoot, 'state'))
+    pollTimer = setInterval(pump, 15000)
+  }
+
   onSnapshot(collection(db, 'agents'), snap => {
     agents.clear()
     snap.forEach(d => agents.set(d.id, { id: d.id, ...d.data() }))
@@ -808,7 +872,7 @@ async function main() {
     snap.forEach(d => users.set(d.id, { uid: d.id, ...d.data() }))
   }, e => log('Error leyendo el equipo:', e.code || e.message))
 
-  if (env.TELEGRAM_BOT_TOKEN && !env.TELEGRAM_BOT_TOKEN.startsWith('PEGA_AQUI')) {
+  if (!loopEnabled && env.TELEGRAM_BOT_TOKEN && !env.TELEGRAM_BOT_TOKEN.startsWith('PEGA_AQUI')) {
     let voz = null
     try { voz = await import('./voz.mjs'); voz.warmUp(log) } catch { log('Notas de voz desactivadas (faltan paquetes: npm install)') }
     telegram = startTelegram({
@@ -827,13 +891,21 @@ async function main() {
 async function shutdown() {
   if (stopping) return
   stopping = true
+  clearInterval(pollTimer)
+  currentLease?.stop()
   log('Apagando motor…')
   telegram?.stop()
   await heartbeat({ online: false })
+  if(activeRun) {
+    const drained = await Promise.race([activeRun.then(() => true), new Promise(r => setTimeout(() => r(false), 25000))])
+    if(!drained) process.exit(1) // Leave the lock for supervised recovery.
+  }
+  unlockLoop?.()
   process.exit(0)
 }
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
+process.on('SIGBREAK', shutdown)
 
 main().catch(e => {
   const code = e.code || ''

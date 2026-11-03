@@ -12,11 +12,12 @@ export function codexEnvironment(env, agentName, color) {
   return {
     ...Object.fromEntries(Object.entries(env).filter(([k, v]) => allowed.test(k) && typeof v === 'string')),
     AGENTES_AGENTE: agentName || '', AGENTES_COLOR: color || '',
+    ...(env.AGENTES_PROJECTS_CONFIG ? { AGENTES_PROJECTS_CONFIG: env.AGENTES_PROJECTS_CONFIG } : {}),
   }
 }
 
 export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 25 * 60 * 1000 } = {}) {
-  return async function runCodex(prompt, cwd, { tools = ['web_search'], resume, agentName, color, maxTurns = 40, outputSchema, roleId = 'personalizado' } = {}) {
+  return async function runCodex(prompt, cwd, { tools = ['web_search'], resume, agentName, color, maxTurns = 40, outputSchema, roleId = 'personalizado', signal } = {}) {
     const controller = new AbortController()
     let reason = '', result = '', sessionId = resume || null, usage = null, completed = false
     const toolNames = new Set()
@@ -33,6 +34,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
     const canRegisterProjects = canWriteProjects || tools.includes('proyectos_registro')
     const canReadProjects = canWriteProjects || tools.includes('proyectos_lectura')
     try {
+      if (signal?.aborted) return response(true, 'Ejecución cancelada antes de iniciar.')
       const roleContext = createRoleSkillContext(roleId)
       const codex = new CodexClient({
         ...(env.CODEX_API_KEY || env.OPENAI_API_KEY ? { apiKey: env.CODEX_API_KEY || env.OPENAI_API_KEY } : {}),
@@ -67,7 +69,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
         webSearchMode: tools.includes('web_search') ? 'live' : 'disabled',
       }
       const thread = resume ? codex.resumeThread(resume, options) : codex.startThread(options)
-      const stream = await thread.runStreamed(`${rules}\n\n${roleContext.text}\n\n## Encargo concreto\n${prompt}`, { signal: controller.signal, ...(outputSchema ? { outputSchema } : {}) })
+      const stream = await thread.runStreamed(`${rules}\n\n${roleContext.text}\n\n## Encargo concreto\n${prompt}`, { signal: signal ? AbortSignal.any([controller.signal, signal]) : controller.signal, ...(outputSchema ? { outputSchema } : {}) })
       let calls = 0
       for await (const event of stream.events) {
         if (event.type === 'thread.started') sessionId = event.thread_id
@@ -84,7 +86,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
           break
         }
       }
-      return response(!!reason || !completed || !result.trim())
+      return response(!!reason || signal?.aborted || !completed || !result.trim())
     } catch (error) {
       return response(true, error.message)
     } finally {

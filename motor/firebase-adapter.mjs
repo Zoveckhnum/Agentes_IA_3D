@@ -1,8 +1,8 @@
-import * as firebaseApp from 'firebase/app'
-import * as firebaseAuth from 'firebase/auth'
-import * as firebaseData from 'firebase/firestore'
 import * as local from '../shared/sql-document-client.mjs'
 const useSql = process.env.AGENTES_DATA_BACKEND === 'sql'
+const firebaseApp = useSql ? null : await import('firebase/app')
+const firebaseAuth = useSql ? null : await import('firebase/auth')
+const firebaseData = useSql ? null : await import('firebase/firestore')
 const provider = useSql ? local : firebaseData
 if (useSql) {
   const base = process.env.AGENTES_API_ORIGIN
@@ -39,6 +39,7 @@ export const getDocs = (...args) => provider.getDocs(...args)
 export const setDoc = (...args) => provider.setDoc(...args)
 export const addDoc = (...args) => provider.addDoc(...args)
 export const updateDoc = (...args) => provider.updateDoc(...args)
+export const updateDocIf = (...args) => { if (!useSql) throw new Error('Auto-loop con asignaciones atómicas requiere SQL'); return local.updateDocIf(...args) }
 export const serverTimestamp = (...args) => provider.serverTimestamp(...args)
 export const increment = (...args) => provider.increment(...args)
 export const writeBatch = (...args) => provider.writeBatch(...args)

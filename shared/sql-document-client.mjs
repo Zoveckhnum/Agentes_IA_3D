@@ -62,6 +62,7 @@ export const getDocs = getDoc
 function commit(operations) { return transport('/data/commit', { method: 'POST', body: { id: crypto.randomUUID(), operations: encode(operations) } }) }
 export const setDoc = (reference, data, options = {}) => commit([{ type: 'set', path: reference.path, data, merge: options.merge === true }])
 export const updateDoc = (reference, data) => commit([{ type: 'update', path: reference.path, data }])
+export const updateDocIf = (reference, data, expected) => transport('/data/commit', { method: 'POST', body: { id: crypto.randomUUID(), operations: encode([{ type: 'update', path: reference.path, data }]), preconditions: encode([{ path: reference.path, expected }]) } })
 export const deleteDoc = reference => commit([{ type: 'delete', path: reference.path }])
 export async function addDoc(reference, data) { const created = doc(reference); await setDoc(created, data); return created }
 export function writeBatch() {

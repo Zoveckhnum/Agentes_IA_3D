@@ -37,7 +37,7 @@ export async function authorizeWrite(actor, operation, before, after, lookup) {
       break
     }
     case 'tasks': {
-      const protectedFields = ['qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead']
+      const protectedFields = ['autoLoopOwner', 'autoLoopExpiresAt', 'autoLoopAttempts', 'qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead']
       const inputsChanged = [...keys].some(k => ['tarea', 'descripcion', 'feedback', 'links', 'asignado', 'projectId'].includes(k))
       if (deleting) { allowed = admin; break }
       if (create) {
@@ -46,6 +46,7 @@ export async function authorizeWrite(actor, operation, before, after, lookup) {
       }
       allowed = admin || (employee && (before.asignado === actor.uid || before.createdBy === actor.email || (before.estado === 'pendiente' && after.asignado === actor.uid))) || (actor.worker && before.asignado === after.asignado && !!await lookup(`agents/${before.asignado}`))
       if (!actor.worker && ([...keys].some(k => protectedFields.includes(k)) || (keys.has('qualityStatus') && after.qualityStatus !== 'pending') || (Object.hasOwn(before, 'qualityStatus') && inputsChanged && after.qualityStatus !== 'pending'))) allowed = false
+      if (keys.has('createdAt')) allowed = false
       if (after.estado === 'completada' && ((after.projectId && !quality(after)) || (Object.hasOwn(before, 'qualityStatus') && (!quality(before) || !quality(after) || inputsChanged)))) allowed = false
       break
     }

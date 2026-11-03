@@ -67,6 +67,19 @@ try {
   const simultaneous = await Promise.all(Array.from({ length: 9 }, () => commit(increment, null, randomUUID(), { Authorization: `Bearer ${config.workerToken}` })))
   for (const r of simultaneous) check(r.status, 200)
   check((await read('tasks/shared')).json.data.counter, 10)
+  const leaseHeaders = { Authorization: `Bearer ${config.workerToken}` }
+  const claim = owner => call('/api/data/commit', { id: randomUUID(), operations: [{ type: 'update', path: 'tasks/shared', data: { autoLoopOwner: owner } }], preconditions: [{ path: 'tasks/shared', expected: { autoLoopOwner: null } }] }, null, leaseHeaders)
+  const claims = await Promise.all([claim('worker-one'), claim('worker-two')])
+  check(claims.filter(r => r.status === 200).length, 1)
+  check(claims.filter(r => r.status === 409).length, 1)
+  const owner = (await read('tasks/shared')).json.data.autoLoopOwner
+  check((await commit([{ type: 'update', path: 'tasks/shared', data: { counter: 999 } }], null, randomUUID(), leaseHeaders)).status, 409)
+  check((await call('/api/data/commit', { id: randomUUID(), operations: [{ type: 'update', path: 'tasks/shared', data: { counter: 999 } }], preconditions: [{ path: 'tasks/shared', expected: { autoLoopOwner: 'stale-worker' } }] }, null, leaseHeaders)).status, 409)
+  check((await read('tasks/shared')).json.data.counter, 10)
+  check((await commit([{ type: 'update', path: 'tasks/shared', data: { autoLoopOwner: null } }])).status, 403)
+  check((await call('/api/data/commit', { id: randomUUID(), operations: [{ type: 'update', path: 'tasks/shared', data: { autoLoopOwner: null } }], preconditions: [{ path: 'tasks/shared', expected: { autoLoopOwner: owner } }] }, null, leaseHeaders)).status, 200)
+  check((await fetch(config.origin + '/api/worker/capabilities', { headers: leaseHeaders })).status, 200)
+  check((await fetch(config.origin + '/api/worker/capabilities', { headers: { Cookie: cookies.owner } })).status, 403)
   const invitation = await commit([{ type: 'set', path: 'invites/new@test.invalid', data: { role: 'empleado' } }])
   check(invitation.status, 200)
   const token = invitation.json.invitations[0].token

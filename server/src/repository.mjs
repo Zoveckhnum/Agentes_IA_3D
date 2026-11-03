@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { sql } from './db.mjs'
-import { documentPath, ApiError, applyMutation, applyQuery } from './values.mjs'
+import { documentPath, ApiError, applyMutation, applyQuery, validateValue } from './values.mjs'
 import { canRead, authorizeWrite } from './policy.mjs'
 const hash = value => createHash('sha256').update(value).digest('hex')
 export function createRepository(database, maxDocuments = 5000, ownerUid = '') {
@@ -39,10 +39,17 @@ export function createRepository(database, maxDocuments = 5000, ownerUid = '') {
       if (!body || !/^[a-f\d]{8}-[a-f\d]{4}-4[a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i.test(body.id || '') || !Array.isArray(body.operations) || body.operations.length < 1 || body.operations.length > 400) throw new ApiError(400, 'invalid-argument')
       const unique = new Set()
       for (const op of body.operations) { documentPath(op.path); if (unique.has(op.path)) throw new ApiError(400, 'invalid-argument'); unique.add(op.path) }
+      const conditions = body.preconditions ?? []
+      if (!Array.isArray(conditions) || conditions.length > body.operations.length) throw new ApiError(400, 'invalid-argument')
+      const checked = new Set()
+      for (const c of conditions) {
+        if (!c || !unique.has(c.path) || checked.has(c.path) || !c.expected || Array.isArray(c.expected) || typeof c.expected !== 'object') throw new ApiError(400, 'invalid-argument')
+        validateValue(c.expected); checked.add(c.path)
+      }
       const transaction = new sql.Transaction(await database.pool())
       await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE)
       try {
-        const digest = hash(JSON.stringify(body.operations))
+        const digest = hash(JSON.stringify(conditions.length ? { operations: body.operations, preconditions: conditions } : body.operations))
         const prior = await new sql.Request(transaction).input('id', sql.UniqueIdentifier, body.id).query('SELECT Actor,RequestHash FROM app.Commits WITH(UPDLOCK,HOLDLOCK) WHERE CommitId=@id')
         if (prior.recordset[0]) {
           if (prior.recordset[0].Actor !== actor.uid || prior.recordset[0].RequestHash !== digest) throw new ApiError(409, 'already-exists')
@@ -51,6 +58,9 @@ export function createRepository(database, maxDocuments = 5000, ownerUid = '') {
         const effective = await actorProfile(actor, transaction), now = new Date(), invitations = []
         for (const op of [...body.operations].sort((a, b) => a.path.localeCompare(b.path))) {
           const before = await lookup(transaction, op.path, true)
+          const condition = conditions.find(c => c.path === op.path)
+          if (condition && Object.entries(condition.expected).some(([key, value]) => JSON.stringify(before?.[key] ?? null) !== JSON.stringify(value))) throw new ApiError(409, 'aborted', 'La tarea cambió o está asignada a otro proceso.')
+          if (actor.worker && op.path.startsWith('tasks/') && before?.autoLoopOwner && condition?.expected?.autoLoopOwner !== before.autoLoopOwner) throw new ApiError(409, 'aborted', 'La escritura requiere la asignación vigente.')
           const after = applyMutation(before, op, now)
           await authorizeWrite(effective, op, before, after, path => lookup(transaction, path))
           if (op.path.startsWith('invites/') && op.path.split('/').length === 2) {
