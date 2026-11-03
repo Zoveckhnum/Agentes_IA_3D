@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "install:all": "npm ci && npm --prefix app ci && npm --prefix motor ci",
     "setup": "node tools/preparar-local.mjs",
@@ -27,7 +29,14 @@
     "sql:test": "npm --prefix server test",
     "sql:test:integration": "npm --prefix server run test:integration",
     "test": "node --test tools/perfil-local.test.mjs && npm --prefix motor test",
-    "test:reglas": "node tools/test-reglas.mjs"
+    "test:reglas": "node tools/test-reglas.mjs",
+    "ci:check": "node tools/ci/checks.mjs",
+    "ci:package": "node tools/ci/package.mjs",
+    "cd:status": "node tools/cd.mjs status",
+    "cd:approve": "node tools/cd.mjs approve",
+    "test:ci": "node --test deploy/cicd/cicd.test.mjs"
   },
-  "devDependencies": { "firebase-tools": "15.34.2" }
+  "devDependencies": {
+    "firebase-tools": "15.34.2"
+  }
 }

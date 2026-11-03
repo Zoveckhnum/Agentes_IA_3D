@@ -10,9 +10,9 @@ import { reviewDelivery } from './calidad.mjs'
 
 const git = (args, cwd) => execFileSync('git', ['-c', 'commit.gpgsign=false', ...args], { cwd, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 function fixture(t) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'agentes-proyecto-')))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'agentes-proyecto-')))
   t.after(() => {
-    assert.ok(relative(realpathSync(tmpdir()), root).startsWith('agentes-proyecto-'))
+    assert.ok(relative(realpathSync.native(tmpdir()), root).startsWith('agentes-proyecto-'))
     rmSync(root, { recursive: true, force: true })
   })
   const repo = join(root, 'products/demo')
