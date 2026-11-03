@@ -94,7 +94,7 @@ async function processApprovals(policy){
       if(verified.digest!==approval.digest)throw new Error('Approved archive changed')
       const migrations=Object.fromEntries(Object.entries(verified.manifest.files).filter(([n])=>n.startsWith('server/migrations/')).map(([n,h])=>[n.slice('server/migrations/'.length),h]))
       if(JSON.stringify(Object.entries(migrations).sort())!==JSON.stringify(Object.entries(policy.migrations).sort()))throw new Error('Schema changed; separate migration approval is required')
-      const receipt={format:'stackbi-deployment-receipt-v1',...candidate,nonce:approval.nonce,environment:'staging',approvedBySid:approval.approvedBySid,startedAt:new Date().toISOString(),status:'started'}
+      const receipt={...candidate,format:'stackbi-deployment-receipt-v1',nonce:approval.nonce,environment:'staging',approvedBySid:approval.approvedBySid,startedAt:new Date().toISOString(),status:'started'}
       const receiptPath=join(root,'receipts',name)
       await writeFile(receiptPath,JSON.stringify(receipt)+'\n',{flag:'wx'});receipts.add(approval.nonce)
       const release=join(policy.applicationRoot,'releases',`ci-${candidate.runId}-${candidate.commit.slice(0,12)}-${approval.nonce.slice(0,8)}`)
