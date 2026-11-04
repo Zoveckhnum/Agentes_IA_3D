@@ -11,12 +11,16 @@ const textPath=/\.(?:md|mjs|js|jsx|ts|tsx|json|ps1|yml|yaml|html|css|txt|rules|t
 const fingerprints=/(?:github_pat_|gh[pousr]_|sk-)[A-Za-z0-9_-]{24,}|\b\d{8,12}:[A-Za-z0-9_-]{30,}|\b(?:ya29\.|GOCSPX-)[A-Za-z0-9_.-]{24,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\r\n]+[A-Za-z0-9+/=\r\n]{64,}-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g
 const entropy=text=>{const counts=new Map();for(const c of text)counts.set(c,(counts.get(c)||0)+1);return [...counts.values()].reduce((n,c)=>n-c/text.length*Math.log2(c/text.length),0)}
 const objects=staged?git(['ls-files','--stage','-z']).split('\0').filter(Boolean).map(line=>{const split=line.indexOf('\t');return line.slice(0,split).split(' ')[1]+' '+line.slice(split+1)}):git(['rev-list','--objects','--all']).trim().split(/\r?\n/),seen=new Set(),findings=[],excludedPrivate=new Set(),candidates=[];let scanned=0,bytes=0,skippedLarge=0
+// rev-list labels a shared blob with just one path. Inspect all historical names
+// separately so an identical public/template file cannot hide a private alias.
+if(!staged)for(const path of git(['log','--all','-m','--format=','--name-only','--no-renames','-z']).split('\0').map(p=>p.replace(/^[\r\n]+/,''))){if(privatePath.test(path))excludedPrivate.add(path)}
 for(const line of objects){
  const split=line.indexOf(' ');if(split<0)continue
  const oid=line.slice(0,split),path=line.slice(split+1)
- if(!/^[a-f0-9]{40,64}$/.test(oid)||seen.has(oid))continue
- seen.add(oid)
+ if(!/^[a-f0-9]{40,64}$/.test(oid))continue
  if(privatePath.test(path)){excludedPrivate.add(path);continue} // Never read private configuration or credentials.
+ if(seen.has(oid))continue
+ seen.add(oid)
  if(textPath.test(path))candidates.push({oid,path})
 }
 const metadata=execFileSync('git',['cat-file','--batch-check'],{cwd:root,input:candidates.map(x=>x.oid).join('\n')+'\n',encoding:'utf8',windowsHide:true,maxBuffer:32*1024*1024}).trim().split(/\r?\n/)
