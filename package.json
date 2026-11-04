@@ -37,7 +37,8 @@
     "test:ci": "node --test deploy/cicd/cicd.test.mjs",
     "memoria": "node tools/memoria.mjs",
     "hitl": "node tools/hitl.mjs",
-    "tokens": "node tools/tokens.mjs"
+    "tokens": "node tools/tokens.mjs",
+    "security:scan": "node tools/security-scan.mjs"
   },
   "devDependencies": {
     "firebase-tools": "15.34.2"

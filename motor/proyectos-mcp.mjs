@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { projects, githubRead, githubDraft, driveList, driveUpload } from './integraciones.mjs'
 import { registerProject } from './registro-proyectos.mjs'
+import {redactSecrets} from './security.mjs'
 
 const cwd = process.argv[2]
 const writable = process.argv[3] === 'write'
@@ -22,7 +23,7 @@ const register = (name, description, shape, fn) => server.registerTool(name, {
   },
 }, async args => {
   try { return { content: [{ type: 'text', text: JSON.stringify(await fn(args)) }] } }
-  catch (error) { return { isError: true, content: [{ type: 'text', text: error.message }] } }
+  catch (error) { return { isError: true, content: [{ type: 'text', text: redactSecrets(error.message) }] } }
 })
 register('listar_proyectos', 'Proyectos autorizados y repositorio por proyecto.', {}, () => projects())
 if (readable) {

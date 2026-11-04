@@ -72,7 +72,7 @@ export function createRoleSkillContext(roleId = 'personalizado', { root = defaul
   const skills = role.skills.map(id => verifySkillBundle(root, id, lock.skills[id]))
   const section = (title, values) => `${title}:\n${values.map(v => '- '+v).join('\n')}`
   return {
-    roleId, skills,
+    roleId, skills,qualityReviewer:!!role.qualityReviewer,
     text: [
       `## Ficha de especialidad obligatoria: ${role.nombre} (${roleId})`,
       `Misión base: ${role.mision}`,

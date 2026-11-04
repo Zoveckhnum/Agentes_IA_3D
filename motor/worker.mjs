@@ -26,6 +26,7 @@ import { createTaskLease, admittedTask, validateLoopPolicy, acquireLoopLock, che
 import { createMemory, memoryContext } from './memoria.mjs'
 import { humanClient,approvalResolution } from './hitl/client.mjs'
 import { referenceContext } from './token-optimization.mjs'
+import {redactSecrets} from './security.mjs'
 import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync, statSync, renameSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -64,7 +65,7 @@ const OWNER = negocio.dueno?.nombre || 'el dueño'
 const LOG_ROOT = process.env.AGENTES_STATE_ROOT || ROOT
 mkdirSync(join(LOG_ROOT, 'logs'), { recursive: true })
 function log(...args) {
-  const line = `[${new Date().toLocaleString('es')}] ${args.join(' ')}`
+  const line = redactSecrets(`[${new Date().toLocaleString('es')}] ${args.join(' ')}`)
   console.log(line)
   try {
     const file=join(LOG_ROOT,'logs','motor.log')
