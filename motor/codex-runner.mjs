@@ -29,15 +29,15 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
     let reason = '', result = '', sessionId = resume || null, usage = null, completed = false
     const toolNames = new Set()
     const approvalRequests = new Map()
-    let audit=null,runId=randomUUID(),auditStarted=false
+    let audit=null,runId=randomUUID(),auditStarted=false,securityBlocked=false
     let reservation=null,settled=false,accounting=null,promptBytes=0
     const timer = setTimeout(() => {
       reason = `Tiempo máximo agotado (${Math.round(timeoutMs / 1000)} s).`
       controller.abort()
     }, timeoutMs)
     const response = (failed, error = '') => {
-      if(containsCredential(result)){failed=true;result='';reason='La respuesta contiene una posible credencial; requiere revisión privada del operador.'}
-      if(auditStarted){auditStarted=false;try{audit('run_finished',{allowed:!failed,runId,reason:failed?'run_failed':'completed'})}catch{failed=true;reason='security_audit_unavailable'}}
+      if(containsCredential(result)){failed=true;securityBlocked=true;result='';reason='La respuesta contiene una posible credencial; requiere revisión privada del operador.'}
+      if(auditStarted){auditStarted=false;try{audit('run_finished',{allowed:!failed,runId,reason:failed?'run_failed':'completed'})}catch{failed=true;securityBlocked=true;reason='security_audit_unavailable'}}
       if(reservation&&!settled){
         settled=true
         try{accounting=meter.finish(reservation,usage,{failed:!!failed})}
@@ -45,7 +45,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
       }
       return ({
       code: failed ? 1 : 0,
-      json: { result: failed ? '' : result, session_id: sessionId, is_error: failed, usage, tools_used: [...toolNames], approval_requests:[...approvalRequests.values()],token_accounting:accounting,prompt_bytes:promptBytes },
+      json: { result: failed ? '' : result, session_id: sessionId, is_error: failed, usage, tools_used: [...toolNames], approval_requests:[...approvalRequests.values()],token_accounting:accounting,prompt_bytes:promptBytes,security_blocked:securityBlocked },
       err: failed ? redactSecrets(reason || error || 'Codex no completó la respuesta.') : '',
     })}
     const canWriteProjects = tools.includes('proyectos_integracion')
@@ -118,10 +118,13 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
       for await (const event of stream.events) {
         if (event.type === 'thread.started') sessionId = event.thread_id
         if(event.type==='item.started'&&event.item.type==='command_execution'){
-          const decision=commandDecision(event.item.command||'');audit('command_denied',{allowed:false,subject:event.item.command||'',reason:decision.reason,runId});reason='La consola general está bloqueada por la política de seguridad.';controller.abort();break
+          securityBlocked=true;const decision=commandDecision(event.item.command||'');audit('command_denied',{allowed:false,subject:event.item.command||'',reason:decision.reason,runId});reason='La consola general está bloqueada por la política de seguridad.';controller.abort();break
         }
         if(event.type==='item.started'&&TOOL_ITEMS.has(event.item.type))audit('tool_started',{subject:event.item.type==='mcp_tool_call'?`${event.item.server}.${event.item.tool}`:event.item.type,runId})
-        if(event.type==='item.completed'&&TOOL_ITEMS.has(event.item.type))audit('tool_finished',{subject:event.item.type==='mcp_tool_call'?`${event.item.server}.${event.item.tool}`:event.item.type,runId})
+        if(event.type==='item.completed'&&TOOL_ITEMS.has(event.item.type))audit('tool_finished',{allowed:event.item.status!=='failed',subject:event.item.type==='mcp_tool_call'?`${event.item.server}.${event.item.tool}`:event.item.type,runId})
+        if(event.type==='item.completed'&&event.item.type==='mcp_tool_call'&&['archivos','contexto'].includes(event.item.server)&&event.item.result?.content?.some(block=>typeof block.text==='string'&&/^(?:Operación bloqueada: security_|security_reference_blocked:)/.test(block.text))){
+          securityBlocked=true;audit('tool_denied',{allowed:false,subject:`${event.item.server}.${event.item.tool}`,reason:'mcp_security_denial',runId});reason='La operación fue bloqueada por la política de seguridad; requiere revisión del operador.';controller.abort();break
+        }
         if (event.type === 'item.started' && TOOL_ITEMS.has(event.item.type) && ++calls > maxTurns) {
           reason = 'El agente agotó su límite de herramientas. Mueve la tarea a Correcciones para continuar.'
           controller.abort()
@@ -143,6 +146,7 @@ export function createCodexRunner(env = {}, { CodexClient = Codex, timeoutMs = 2
       }
       return response(!!reason || signal?.aborted || !completed || !result.trim())
     } catch (error) {
+      if(/^security_/.test(error.message))securityBlocked=true
       return response(true, error.message)
     } finally {
       clearTimeout(timer)

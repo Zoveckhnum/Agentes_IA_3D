@@ -47,6 +47,7 @@ test('credenciales sintéticas se omiten en mensajes y se bloquean en archivos',
  const values=['sk-'+('a'.repeat(30)),'github_pat_'+('b'.repeat(40)),('123456789:')+('c'.repeat(35)),'Bearer '+('d'.repeat(30)),'password="'+('e'.repeat(25))+'"','refresh_token="'+('f'.repeat(30))+'"','-----BEGIN PRIVATE KEY-----\nSYNTHETIC\n-----END PRIVATE KEY-----']
  for(const value of values){assert.equal(containsCredential(value),true);assert.equal(redactSecrets(value).includes(value),false);assert.throws(()=>createWorkspaceGate(dir(),{writable:true}).write({path:'config.txt',content:value}),/sensitive/)}
  assert.equal(redactSecrets('Informe sin credenciales'),'Informe sin credenciales')
+ assert.equal(redactSecrets('const api_key = process.env.OPENAI_API_KEY'),'const api_key = process.env.OPENAI_API_KEY')
 })
 test('auditoría solo contiene hashes y códigos; falla si se exige Windows sin escritor',()=>{
  const secret='sk-'+('z'.repeat(30)),event=createSecurityAuditor({}, {taskId:secret,projectId:'privado'})('tool_denied',{subject:secret,allowed:false,reason:'workspace_policy'})
@@ -72,4 +73,10 @@ test('roles de QA reciben lector y no escritor; evento inesperado de consola inv
  const calls=[];class Client{constructor(o){calls.push(o)}startThread(o){calls.push(o);return this}async runStreamed(){return {events:(async function*(){yield {type:'item.started',item:{type:'command_execution',command:'git push --force origin main'}}})()}}}
  const response=await createCodexRunner({},{CodexClient:Client})('Revisar',dir(),{roleId:'qa_software',tools:[]})
  assert.equal(response.code,1);assert.equal(calls[1].sandboxMode,'read-only');assert.equal(calls[0].config.mcp_servers.archivos.enabled_tools.includes('escribir'),false)
+})
+test('un rechazo de seguridad del MCP cancela el turno sin esperar otra respuesta del modelo',async()=>{
+ let continued=false
+ class Client{startThread(){return this}async runStreamed(){return {events:(async function*(){yield {type:'item.completed',item:{type:'mcp_tool_call',server:'archivos',tool:'leer',status:'failed',result:{content:[{type:'text',text:'Operación bloqueada: security_path_forbidden'}]}}};continued=true;yield {type:'item.completed',item:{type:'agent_message',text:'no debe entregar'}}})()}}}
+ const result=await createCodexRunner({},{CodexClient:Client})('Prueba',dir(),{tools:[]})
+ assert.equal(result.code,1);assert.equal(result.json.security_blocked,true);assert.equal(result.json.result,'');assert.equal(continued,false)
 })

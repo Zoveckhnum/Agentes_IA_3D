@@ -5,7 +5,7 @@ import {existsSync,lstatSync,realpathSync} from 'node:fs'
 export const fingerprint=value=>createHash('sha256').update(String(value)).digest('hex')
 export const SECURITY_FEATURES=Object.freeze({shell_tool:false,apps:false,plugins:false,remote_plugin:false,multi_agent:false,multi_agent_v2:false,code_mode:false,code_mode_host:true,browser_use:false,browser_use_external:false,browser_use_full_cdp_access:false,in_app_browser:false,computer_use:false,image_generation:false,view_image:false,skill_search:false,skill_mcp_dependency_install:false,request_permissions_tool:false,enable_mcp_apps:false})
 const credentialPatterns=[/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g,/(?:github_pat_|gh[pousr]_|sk-)[A-Za-z0-9_-]{16,}/g,/\b\d{8,12}:[A-Za-z0-9_-]{30,}\b/g,/\b(?:ya29\.|GOCSPX-)[A-Za-z0-9_.-]{12,}/g,/Bearer\s+[A-Za-z0-9._~+\/-]{12,}/gi,/(?:password|contrase(?:ñ|n)a|api[_-]?key|access_token|refresh_token|client_secret|bot_token|secret)\s*["']?\s*[:=]\s*["']?[^\s"',;}{]{8,}/gi]
-export function redactSecrets(value){let text=String(value);for(const regex of credentialPatterns)text=text.replace(regex,'[CREDENCIAL OMITIDA]');return text}
+export function redactSecrets(value){let text=String(value);for(const regex of credentialPatterns)text=text.replace(regex,match=>/[:=]\s*(?:process\.env[.\[]|os\.environ|(?:config|options|env)\.)/.test(match)?match:'[CREDENCIAL OMITIDA]');return text}
 export function containsCredential(value){return redactSecrets(value)!==String(value)}
 export function commandDecision(command){
  const text=String(command)
