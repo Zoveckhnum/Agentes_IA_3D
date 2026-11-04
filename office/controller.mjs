@@ -34,8 +34,8 @@ export async function officeTick({root,authorize,host,pauseTasks=async()=>{},res
  if(state.mode==='closing'){
   await host('quiesce')
   if((await host('busy')).busy)return state
-  await host('stop')
   await pauseTasks(state.closedId)
+  await host('stop')
   save({...state,mode:'closed',fullyClosedAt:now().toISOString()})
  }
  if(state.mode==='closed'&&state.autoResume!==false&&now().getTime()>=Date.parse(state.reopenAt))save({...state,mode:'opening',revision:state.revision+1,openedBy:'scheduled-controller',attempts:0})
@@ -69,7 +69,7 @@ export function createTaskPauser(database){
     if(!resume&&task.autoLoopOwner&&task.estado==='en_progreso'){
      task.officePause={closeId,previousEstado:'en_revision'};task.estado='en_espera';task.agentStatus='office_paused';task.autoLoopOwner=null;task.autoLoopExpiresAt=null;task.timerStartedAt=null;changed=true
     }else if(resume&&task.officePause?.closeId===closeId&&task.agentStatus==='office_paused'){
-     task.estado='en_revision';task.agentStatus='queued';delete task.officePause;changed=true
+     task.estado='en_revision';task.agentStatus='queued';if(Number.isInteger(task.autoLoopAttempts)&&task.autoLoopAttempts>0)task.autoLoopAttempts--;delete task.officePause;changed=true
     }
     if(changed)await new sql.Request(tx).input('path',sql.NVarChar(450),row.Path).input('payload',sql.NVarChar(sql.MAX),JSON.stringify(task)).query("UPDATE app.Documents SET Payload=@payload,UpdatedAt=SYSUTCDATETIME() WHERE Path=@path; INSERT INTO app.AuditLog(Actor,Action,DocumentPath) VALUES(N'office-controller',N'office-pause-resume',@path)")
    }

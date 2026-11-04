@@ -27,12 +27,12 @@ export async function verifyOfficeIntegration({database,config,cookies,password}
   const pool=await database.pool()
   await new sql.Request(pool).query("UPDATE app.Accounts SET Disabled=1 WHERE Uid='owner'");check(await authorize(command),false)
   await new sql.Request(pool).query("UPDATE app.Accounts SET Disabled=0 WHERE Uid='owner'; UPDATE app.Documents SET Payload=JSON_MODIFY(Payload,'$.executiveRole',NULL) WHERE Path='users/owner'");check(await authorize(command),false)
-  await new sql.Request(pool).query("UPDATE app.Documents SET Payload=JSON_MODIFY(Payload,'$.executiveRole','ceo') WHERE Path='users/owner'; INSERT INTO app.Documents(Path,CollectionPath,DocumentId,Payload) VALUES('tasks/office-active','tasks','office-active',N'{\"estado\":\"en_progreso\",\"autoLoopOwner\":\"synthetic-worker\",\"descripcion\":\"preserve this task\"}')")
+  await new sql.Request(pool).query("UPDATE app.Documents SET Payload=JSON_MODIFY(Payload,'$.executiveRole','ceo') WHERE Path='users/owner'; INSERT INTO app.Documents(Path,CollectionPath,DocumentId,Payload) VALUES('tasks/office-active','tasks','office-active',N'{\"estado\":\"en_progreso\",\"autoLoopOwner\":\"synthetic-worker\",\"autoLoopAttempts\":3,\"descripcion\":\"preserve this task\"}')")
   const tasks=createTaskPauser(database)
   check((await officeTick({root,authorize,host:async op=>op==='busy'?{busy:false}:{services:[],sites:[]},pauseTasks:tasks.pause})).mode,'closed')
   const task=async()=>JSON.parse((await new sql.Request(pool).query("SELECT Payload FROM app.Documents WHERE Path='tasks/office-active'")).recordset[0].Payload)
   check((await task()).agentStatus,'office_paused');check((await task()).descripcion,'preserve this task')
-  await tasks.resume(id);check((await task()).agentStatus,'queued');check((await task()).officePause,undefined)
+  await tasks.resume(id);check((await task()).agentStatus,'queued');check((await task()).officePause,undefined);check((await task()).autoLoopAttempts,2)
   check((await call('status',null,cookies.owner)).status,200)
   return assertions
  }finally{server.closeAllConnections();await new Promise(r=>server.close(r));rmSync(root,{recursive:true})}

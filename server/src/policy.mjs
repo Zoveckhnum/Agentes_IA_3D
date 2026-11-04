@@ -49,6 +49,7 @@ export async function authorizeWrite(actor, operation, before, after, lookup) {
       allowed = admin || (employee && (before.asignado === actor.uid || before.createdBy === actor.email || (before.estado === 'pendiente' && after.asignado === actor.uid))) || (actor.worker && before.asignado === after.asignado && !!await lookup(`agents/${before.asignado}`))
       if (!actor.worker && ([...keys].some(k => protectedFields.includes(k)) || (keys.has('qualityStatus') && after.qualityStatus !== 'pending') || (Object.hasOwn(before, 'qualityStatus') && inputsChanged && after.qualityStatus !== 'pending'))) allowed = false
       if (keys.has('createdAt')) allowed = false
+      if (keys.has('officePause') || before.officePause) allowed = false
       if (after.estado === 'completada' && ((after.projectId && !quality(after)) || (Object.hasOwn(before, 'qualityStatus') && (!quality(before) || !quality(after) || inputsChanged)))) allowed = false
       if (after.estado === 'completada' && (after.humanApprovalRequests?.length || ['needs_approval','approval_blocked'].includes(after.agentStatus))) allowed = false
       break

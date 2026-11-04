@@ -34,8 +34,16 @@ test('cierre preserva snapshot, espera operación en curso y detiene antes de ma
  const host=async op=>{calls.push(op);return op==='snapshot'?{saved:true}:op==='busy'?{busy}: {ok:true}}
  const options={root,host,now,authorize:async()=>true,pauseTasks:async()=>calls.push('pause-tasks')}
  let state=await officeTick(options);assert.equal(state.mode,'closing');assert.equal(calls.includes('stop'),false)
- busy=false;state=await officeTick(options);assert.equal(state.mode,'closed');assert.equal(state.reopenAt,'2026-11-04T13:00:00.000Z');assert.ok(calls.indexOf('stop')<calls.indexOf('pause-tasks'))
+ busy=false;state=await officeTick(options);assert.equal(state.mode,'closed');assert.equal(state.reopenAt,'2026-11-04T13:00:00.000Z');assert.ok(calls.indexOf('pause-tasks')<calls.indexOf('stop'))
  assert.equal(JSON.stringify(state).includes(actor.tokenHash),false)
+})
+
+test('ni worker ni administrador pueden alterar el marcador de pausa protegido',async()=>{
+ const before={asignado:'agent',estado:'en_espera',officePause:{closeId:'synthetic'}},after={...before,estado:'en_revision'}
+ for(const a of [{uid:'worker',worker:true},{uid:'owner',role:'admin',isSuper:true}]){
+  await assert.rejects(authorizeWrite(a,{path:'tasks/paused'},before,after,async()=>({active:true})))
+  await assert.rejects(authorizeWrite(a,{path:'tasks/fresh'},{asignado:'agent'},{asignado:'agent',officePause:{}},async()=>({active:true})))
+ }
 })
 test('reapertura automática no ocurre antes de 07:00 ni con autoResume deshabilitado',async()=>{
  const root=fixture({mode:'closed',reopenAt:'2026-11-04T13:00:00Z',closedId:randomUUID()}),calls=[];atomicOfficeJson(join(root,'private','snapshot.json'),{saved:true})
