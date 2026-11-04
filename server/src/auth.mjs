@@ -54,7 +54,7 @@ export function createAuth(database, config) {
       if (!account) throw new ApiError(401, 'unauthenticated')
       return { ...publicUser(account), tokenHash: sha(token), sessionCreatedAt: account.SessionCreatedAt }
     },
-    async login(req, res) {
+    async login(req, res, authorizeAccount) {
       const { email, password, remember = false } = req.body || {}
       if (typeof email !== 'string' || email.length > 320 || typeof password !== 'string' || password.length > 1024) throw new ApiError(400, 'invalid-argument')
       const key = `${req.ip}:${sha(email.toLowerCase())}`, now = Date.now()
@@ -71,6 +71,7 @@ export function createAuth(database, config) {
           if (account) await new sql.Request(pool).input('uid', sql.NVarChar(128), account.Uid).query('UPDATE app.Accounts SET FailedLogins=FailedLogins+1,LockedUntil=CASE WHEN FailedLogins>=7 THEN DATEADD(minute,10,SYSUTCDATETIME()) ELSE LockedUntil END WHERE Uid=@uid')
           throw new ApiError(401, 'auth/invalid-credential')
         }
+        if(authorizeAccount)await authorizeAccount(account)
         const token = randomBytes(32).toString('base64url'), expires = new Date(now + (remember ? 7 * 86400e3 : 8 * 3600e3))
         await new sql.Request(pool).input('uid', sql.NVarChar(128), account.Uid).input('hash', sql.Char(64), sha(token)).input('version', sql.Int, account.CredentialVersion).input('expires', sql.DateTime2, expires)
           .query('UPDATE app.Accounts SET FailedLogins=0,LockedUntil=NULL WHERE Uid=@uid; INSERT INTO app.Sessions(TokenHash,Uid,CredentialVersion,ExpiresAt) VALUES(@hash,@uid,@version,@expires)')

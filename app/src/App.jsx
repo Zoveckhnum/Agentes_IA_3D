@@ -4,6 +4,7 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, onSnapshot, orderBy, query, getDocs } from './data/firestore.js'
 import { useLocalSql } from './data/mode.js'
 import PasswordChangePage from './pages/PasswordChangePage.jsx'
+import {OfficeAvailabilityGuard} from './components/OfficePower.jsx'
 
 import LoginPage from './pages/LoginPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -308,6 +309,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctxValue}>
+      <OfficeAvailabilityGuard />
       <div className="app-layout">
         {/* Banner modo empleado */}
         {viewAsEmployee && (

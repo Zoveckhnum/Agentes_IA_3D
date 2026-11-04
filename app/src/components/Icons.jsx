@@ -17,6 +17,7 @@ const PATHS = {
   door:      <><path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17"/><path d="M3 21h18"/><path d="M15 12h.01"/></>,
 
   // Acciones
+  power:     <><path d="M12 2v10"/><path d="M5.6 5.6a9 9 0 1 0 12.8 0"/></>,
   plus:      <><path d="M12 5v14M5 12h14"/></>,
   edit:      <><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></>,
   trash:     <><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></>,

@@ -442,6 +442,7 @@ function EditUserModal({ target, onClose, showToast, isSuperAdmin }) {
     name: target.name || '',
     email: target.email || '',
     position: target.position || '',
+    executiveRole: target.executiveRole || '',
     phone: target.phone || '',
     bio: target.bio || '',
   })
@@ -457,6 +458,7 @@ function EditUserModal({ target, onClose, showToast, isSuperAdmin }) {
         phone: form.phone.trim(),
         bio: form.bio.trim(),
       }
+      if(isSuperAdmin)updates.executiveRole=form.executiveRole||null
       // Solo el Super Admin puede cambiar el correo de contacto
       if (isSuperAdmin && form.email.trim()) {
         updates.email = form.email.trim().toLowerCase()
@@ -500,6 +502,7 @@ function EditUserModal({ target, onClose, showToast, isSuperAdmin }) {
               onChange={e => setForm(f => ({ ...f, position: e.target.value }))}
               placeholder="Ej. Diseñadora" />
           </div>
+          {isSuperAdmin&&<div className="form-group"><label className="form-label">Permiso de dirección</label><select className="form-input" value={form.executiveRole} onChange={e=>setForm(f=>({...f,executiveRole:e.target.value}))}><option value="">Sin control de cierre</option><option value="ceo">CEO · cerrar y abrir la oficina</option></select><p style={{fontSize:12,marginTop:6}}>Solo aplica a una cuenta humana activa. El texto del cargo no concede este permiso.</p></div>}
           <div className="form-group">
             <label className="form-label">Teléfono</label>
             <input className="form-input" value={form.phone}

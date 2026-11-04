@@ -13,6 +13,8 @@ if(Test-Path -LiteralPath $release){throw 'Ya existe esa versión; revisar antes
 New-Item -ItemType Directory -Path (Join-Path $release 'motor') -Force|Out-Null
 foreach($file in Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'motor') -File|Where-Object {$_.Name -eq 'AGENTS.md' -or ($_.Extension -eq '.mjs' -and $_.Name -notlike '*.test.mjs')}){Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $release 'motor')}
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'motor\hitl') -Destination (Join-Path $release 'motor') -Recurse
+New-Item -ItemType Directory -Path (Join-Path $release 'office') -Force|Out-Null
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'office\core.mjs') -Destination (Join-Path $release 'office\core.mjs')
 foreach($dir in @('roles','shared')){Copy-Item -LiteralPath (Join-Path $RepositoryRoot $dir) -Destination (Join-Path $release $dir) -Recurse}
 $xmlPath=Join-Path $root 'service\StackBI-AgentMotor.xml'
 $beforeXml=Get-Content -LiteralPath $xmlPath -Raw

@@ -5,6 +5,7 @@ import { databaseConfig } from '../src/config.mjs'
 import { migrateSchema } from './migrate-schema.mjs'
 import { passwordDigest } from '../src/passwords.mjs'
 import { createApplication } from '../src/main.mjs'
+import {verifyOfficeIntegration} from '../../office/sql-integration.mjs'
 
 const name = `AgentesIA3D_Test_${randomBytes(5).toString('hex')}`
 const master = createDatabase(databaseConfig({ ...process.env, CORE_DB_NAME: 'master' }))
@@ -98,6 +99,10 @@ try {
   check((await call('/api/auth/me', undefined, 'pending')).status, 401)
   check((await call('/api/auth/login', { email: 'pending@test.invalid', password: changed }, 'pending')).status, 200)
   check((await call('/api/data/read', { kind: 'collection', path: 'tasks' }, 'pending')).status, 403)
+  check((await commit([{type:'update',path:'users/employee',data:{executiveRole:'ceo'}}],'employee')).status,403)
+  check((await commit([{type:'update',path:'users/owner',data:{executiveRole:'ceo'}}],null,randomUUID(),leaseHeaders)).status,403)
+  check((await commit([{type:'update',path:'users/owner',data:{executiveRole:'ceo'}}])).status,200)
+  assertions+=await verifyOfficeIntegration({database,config,cookies,password})
   await new sql.Request(pool).query("UPDATE dbo.SchemaMigrations SET SHA256=REPLICATE('0',64) WHERE Name='001-initial.sql'")
   await assert.rejects(migrateSchema(database), /migración aplicada/); assertions++
   const invalidConfig = databaseConfig(process.env)

@@ -4,6 +4,7 @@ import { db } from '../firebase.js'
 import { doc, updateDoc, addDoc, deleteDoc, collection, serverTimestamp, Timestamp, onSnapshot } from '../data/firestore.js'
 import { OfficeScene } from '../office/scene.js'
 import Icon from '../components/Icons.jsx'
+import OfficePower from '../components/OfficePower.jsx'
 import AgentModal, { AgentAvatar } from '../components/AgentModal.jsx'
 import AvatarModal from '../components/AvatarModal.jsx'
 import AgentChat from '../components/AgentChat.jsx'
@@ -295,6 +296,7 @@ export default function OfficeView() {
         </div>
         {me && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <OfficePower />
             {isAdmin && agents.length > 0 && (
               <button className="btn btn-primary btn-sm" onClick={() => setChatWith('grupo')}>
                 <Icon name="users" size={14} /> Chat de agentes

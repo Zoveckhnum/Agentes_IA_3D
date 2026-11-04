@@ -2,12 +2,22 @@ import { createServer } from 'node:http'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createApprovalLedger, authorized, readJson, atomicJson, buttons, approvalText } from './core.mjs'
+import {readOfficeState,CLOSED_MESSAGE,officeUnavailable} from '../../office/core.mjs'
 
-export function createHumanServer({root,ownerId,submitHash,executeHash,token,fetchImpl=fetch,port=10013}) {
+export function createHumanServer({root,ownerId,submitHash,executeHash,token,fetchImpl=fetch,port=10013,officeStateFile}) {
   const ledger=createApprovalLedger({root:join(root,'state','requests'),registry:join(root,'registry'),ownerId})
   const stop=new AbortController(),cursor=join(root,'state','telegram-cursor.json')
   let offset=0,botOnline=false,polling=false
   const deliveries=new Set()
+  const office=()=>{try{return readOfficeState(officeStateFile)}catch{return {mode:'error'}}}
+  async function officeNotice(state){
+    if(state.mode!=='closed'||!state.closedId)return
+    const path=join(root,'state','office-notice.json')
+    try{if(readJson(path).closedId===state.closedId)return}catch(error){if(error.code!=='ENOENT')throw error}
+    atomicJson(path,{closedId:state.closedId,status:'sending',time:new Date().toISOString()})
+    try{const message=await call('sendMessage',{chat_id:ownerId,text:CLOSED_MESSAGE});atomicJson(path,{closedId:state.closedId,status:'delivered',messageId:message.message_id,time:new Date().toISOString()})}
+    catch{atomicJson(path,{closedId:state.closedId,status:'unknown',time:new Date().toISOString()});throw new Error('Office notice uncertain')}
+  }
   const view=record=>{const {nonce,ownerId,decidedBy,...visible}=record;return visible}
   try{offset=readJson(cursor).offset;if(!Number.isSafeInteger(offset)||offset<0)throw new Error('Invalid Telegram cursor')}catch(e){if(e.code!=='ENOENT')throw e}
   const call=async(method,body={})=>{
@@ -33,6 +43,7 @@ export function createHumanServer({root,ownerId,submitHash,executeHash,token,fet
   }
   async function callback(query) {
     if(String(query?.from?.id)!==String(ownerId))return
+    if(officeUnavailable(office())){await call('answerCallbackQuery',{callback_query_id:query.id,text:CLOSED_MESSAGE,show_alert:true}).catch(()=>{});return}
     let record,text='No se autorizó: solicitud ajena, vencida, modificada o ya decidida.'
     try{record=ledger.decide(query);text=record.status==='approved'?'Aprobada para esta revisión.':'Rechazada.'}catch{}
     await call('answerCallbackQuery',{callback_query_id:query.id,text,show_alert:!record}).catch(()=>{})
@@ -43,14 +54,17 @@ export function createHumanServer({root,ownerId,submitHash,executeHash,token,fet
     while(!stop.signal.aborted){
       try{
         await call('getMe');botOnline=true
-        for(const record of ledger.list())await deliver(record)
+        const currentOffice=office()
+        if(officeUnavailable(currentOffice))await officeNotice(currentOffice)
+        else for(const record of ledger.list())await deliver(record)
         const updates=await call('getUpdates',{offset,timeout:20,allowed_updates:['callback_query','message']})
         for(const update of updates){
           if(!Number.isSafeInteger(update.update_id)||update.update_id<offset)continue
           if(update.callback_query)await callback(update.callback_query)
           const message=update.message
-          if(message?.chat?.type==='private'&&String(message.from?.id)===String(ownerId)&&String(message.chat.id)===String(ownerId)&&typeof message.text==='string'){
-            if(/^\/(estado|start|ayuda)(?:\s|$)/.test(message.text)){
+          if(message?.chat?.type==='private'&&String(message.from?.id)===String(ownerId)&&String(message.chat.id)===String(ownerId)){
+            if(officeUnavailable(office()))await call('sendMessage',{chat_id:ownerId,text:CLOSED_MESSAGE})
+            else if(typeof message.text==='string'&&/^\/(estado|start|ayuda)(?:\s|$)/.test(message.text)){
               const counts=ledger.list().reduce((map,r)=>(map[r.status]=(map[r.status]||0)+1,map),{})
               await call('sendMessage',{chat_id:ownerId,text:'Aprobaciones StackBI activas. Usa los botones de cada solicitud. Un mensaje de texto no autoriza operaciones.\nEstado: '+JSON.stringify(counts)})
             }
@@ -71,6 +85,7 @@ export function createHumanServer({root,ownerId,submitHash,executeHash,token,fet
     if(req.url==='/health'&&req.method==='GET')return respond(200,{ok:true,telegramOnline:botOnline})
     const submit=authorized(req.headers.authorization,submitHash),execute=authorized(req.headers.authorization,executeHash)
     if(!submit&&!execute)return respond(401,{error:'unauthorized'})
+    if(officeUnavailable(office())&&!req.url?.startsWith('/requests/')&&req.url!=='/complete')return req.url==='/approved'&&execute?respond(200,{requests:[]}):respond(503,{error:'office-closed',message:CLOSED_MESSAGE})
     try{
       if(req.url==='/approved'&&req.method==='GET'&&execute)return respond(200,{requests:ledger.list().filter(r=>r.status==='approved').map(view)})
       if(req.url?.startsWith('/requests/')&&req.method==='GET')return respond(200,view(ledger.get(req.url.slice('/requests/'.length))))
@@ -96,7 +111,7 @@ export function createHumanServer({root,ownerId,submitHash,executeHash,token,fet
 
 if(process.argv[1]===fileURLToPath(import.meta.url)){
   const root=process.env.APP_HITL_ROOT||'C:\\ProgramData\\StackBI\\HumanApprovals'
-  const service=createHumanServer({root,ownerId:process.env.APP_HITL_OWNER_ID,submitHash:process.env.APP_HITL_SUBMIT_HASH,executeHash:process.env.APP_HITL_EXECUTE_HASH,token:process.env.APP_HITL_BOT_TOKEN})
+  const service=createHumanServer({root,ownerId:process.env.APP_HITL_OWNER_ID,submitHash:process.env.APP_HITL_SUBMIT_HASH,executeHash:process.env.APP_HITL_EXECUTE_HASH,token:process.env.APP_HITL_BOT_TOKEN,officeStateFile:process.env.APP_OFFICE_STATE_FILE})
   await service.start()
   console.log(JSON.stringify({event:'human_approval_service_started',host:'127.0.0.1',port:10013}))
   let stopping=false

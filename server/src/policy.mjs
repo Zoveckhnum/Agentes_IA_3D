@@ -33,11 +33,13 @@ export async function authorizeWrite(actor, operation, before, after, lookup) {
       else if (admin) allowed = (actor.isSuper || (!keys.has('isSuper') && (!keys.has('role') || (before.role !== 'admin' && after.role !== 'admin')))) && (!before?.isSuper || actor.uid === id) && !keys.has('email')
       else allowed = actor.uid === id && after.email === actor.email && only(keys, ['name', 'photo', 'phone', 'bio', 'position', 'color', 'lastSeen', 'look'])
       if (after && !['admin', 'empleado', 'pending'].includes(after.role)) allowed = false
+      if(keys.has('executiveRole')&&(!admin||!actor.isSuper||actor.worker||create||deleting))allowed=false
+      if(after?.executiveRole!==undefined&&!['ceo',null].includes(after.executiveRole))allowed=false
       if (before?.isSuper && (deleting || after?.isSuper !== true || after?.role !== 'admin')) allowed = false
       break
     }
     case 'tasks': {
-      const protectedFields = ['humanApprovalRequests','humanApprovalHistory','autoLoopOwner', 'autoLoopExpiresAt', 'autoLoopAttempts', 'qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead']
+      const protectedFields = ['officePause','humanApprovalRequests','humanApprovalHistory','autoLoopOwner', 'autoLoopExpiresAt', 'autoLoopAttempts', 'qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead']
       const inputsChanged = [...keys].some(k => ['tarea', 'descripcion', 'feedback', 'links', 'asignado', 'projectId'].includes(k))
       if (deleting) { allowed = admin; break }
       if (create) {

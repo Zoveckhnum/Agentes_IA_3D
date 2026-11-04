@@ -10,6 +10,8 @@ $commit=(& git -C $RepositoryRoot rev-parse HEAD).Trim()
 foreach($folder in @('','program\motor','program\deploy','program\deploy\windows','program\support','program\support\tools','program\support\motor','program\support\app','program\tools','registry','work','state','state\requests','service','secrets','logs')){New-Item -ItemType Directory -Path (Join-Path $root $folder) -Force|Out-Null}
 icacls $root /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)(F)' '*S-1-5-32-544:(OI)(CI)(F)'|Out-Null;if($LASTEXITCODE){throw 'Fallo de ACL'}
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'motor\hitl') -Destination (Join-Path $root 'program\motor') -Recurse
+New-Item -ItemType Directory -Path (Join-Path $root 'program\office') -Force|Out-Null
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'office\core.mjs') -Destination (Join-Path $root 'program\office\core.mjs')
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'deploy\cicd') -Destination (Join-Path $root 'program\deploy') -Recurse
 foreach($file in @('Invoke-HumanSql.ps1','Update-SqlPreview.ps1','Backup-LocalSql.ps1')){Copy-Item -LiteralPath (Join-Path $RepositoryRoot ('deploy\windows\'+$file)) -Destination (Join-Path $root 'program\deploy\windows')}
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'server\tools\backup-plan.mjs') -Destination (Join-Path $root 'program\deploy\windows')
