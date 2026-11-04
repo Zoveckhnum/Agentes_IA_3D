@@ -26,6 +26,7 @@ import { createTaskLease, admittedTask, validateLoopPolicy, acquireLoopLock, che
 import { createMemory, memoryContext } from './memoria.mjs'
 import { humanClient,approvalResolution } from './hitl/client.mjs'
 import { referenceContext } from './token-optimization.mjs'
+import {redactSecrets} from './security.mjs'
 import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync, statSync, renameSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -64,7 +65,7 @@ const OWNER = negocio.dueno?.nombre || 'el dueño'
 const LOG_ROOT = process.env.AGENTES_STATE_ROOT || ROOT
 mkdirSync(join(LOG_ROOT, 'logs'), { recursive: true })
 function log(...args) {
-  const line = `[${new Date().toLocaleString('es')}] ${args.join(' ')}`
+  const line = redactSecrets(`[${new Date().toLocaleString('es')}] ${args.join(' ')}`)
   console.log(line)
   try {
     const file=join(LOG_ROOT,'logs','motor.log')
@@ -123,7 +124,7 @@ let stopping = false
 const heartbeat = (extra = {}) =>
   setDoc(doc(db, 'config', 'agentWorker'), {
     online: !stopping, lastSeen: serverTimestamp(), host: os.hostname(), busyWith,
-    ...(loopEnabled ? {autoLoop:true,acceptAfter:loopPolicy.acceptAfter,maxTasksPerDay:loopPolicy.maxTasksPerDay,memory:memory.status(),externalNotifications:false,tokenUsage:invokeCodex.tokenReport()} : {}), ...extra,
+    ...(loopEnabled ? {autoLoop:true,acceptAfter:loopPolicy.acceptAfter,maxTasksPerDay:loopPolicy.maxTasksPerDay,memory:memory.status(),externalNotifications:false,tokenUsage:invokeCodex.tokenReport(),security:{mode:env.AGENTES_SECURITY_MODE||'unconfigured',generalShell:false,workspaceGate:true,windowsAudit:!!env.AGENTES_SECURITY_AUDIT_WRITER}} : {}), ...extra,
   }, { merge: true }).then(() => {
     if(loopEnabled)try { writeFileSync(join(stateRoot,'state','consensus.md'), '# Estado del motor\n\nSQL es la fuente canónica; esta vista se reconstruye.\n\n' + JSON.stringify([...tasks.values()].filter(t=>admittedTask(t,loopPolicy)).slice(0,50).map(t=>({id:t.id,estado:t.estado,agentStatus:t.agentStatus||'',qualityStatus:t.qualityStatus||'',dependsOn:t.dependsOn||[]})))) } catch {}
     return true
@@ -580,6 +581,10 @@ async function executeTask(t, setWorkspace) {
     ...(stillMine ? { estado: 'en_espera' } : {}),
   }
 
+  if(res.json?.security_blocked){
+    await updateTask(ref,{...base,agentStatus:'error',qualityStatus:'blocked',agentError:res.err||'Operación bloqueada por seguridad; requiere revisión del operador.',...(res.json.approval_requests?.length?{humanApprovalRequests:res.json.approval_requests.map(r=>r.requestId)}:{})})
+    return
+  }
   if(res.json?.approval_requests?.length){
     const ids=res.json.approval_requests.map(r=>r.requestId),records=await approvalRecords(t,ids)
     if(records.some(r=>r.status!=='executed')){

@@ -81,7 +81,7 @@ test('extrae entrega final, sesión y tokens sin convertirlos en dólares', asyn
   assert.equal(calls[0][1].env.AGENT_PASSWORD, undefined)
   assert.equal(calls[1][1].webSearchMode, 'disabled')
   assert.equal(calls[1][1].approvalPolicy, 'never')
-  assert.equal(calls[1][1].sandboxMode, 'workspace-write')
+  assert.equal(calls[1][1].sandboxMode, 'read-only')
   assert.equal(calls[1][1].model, 'mi-modelo')
   assert.match(calls[2][1], /No publiques en producción/)
 })
@@ -104,7 +104,7 @@ test('un fallo o stream incompleto nunca entrega avances como resultado aprobado
 test('cancela al superar el presupuesto de herramientas', async () => {
   const { Client } = fake([
     { type: 'item.started', item: { type: 'mcp_tool_call' } },
-    { type: 'item.started', item: { type: 'command_execution' } }, message('no entregar'), completed,
+    { type: 'item.started', item: { type: 'mcp_tool_call' } }, message('no entregar'), completed,
   ])
   const res = await createCodexRunner({}, { CodexClient: Client })('tarea', '/trabajo', { maxTurns: 1 })
   assert.equal(res.code, 1)

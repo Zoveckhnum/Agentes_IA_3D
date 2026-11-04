@@ -19,6 +19,9 @@ superadas por estas implementaciones. Los apartados 5–6 conservan sus brechas 
 en SQL y Drive faltan pruebas operativas con cambios concretos revisados y autorizados.
 Se incorporó [optimización de tokens](OPTIMIZACION-TOKENS.md): registro persistente,
 presupuestos de admisión y entregables largos como referencias íntegras por hash.
+Se añadieron [barreras de seguridad](BARRERAS-SEGURIDAD.md): consola general deshabilitada,
+edición por MCP dentro de la tarea, QA de solo lectura, redacción de credenciales,
+ganchos Git y auditoría en Windows Event Log, con pruebas reales bajo el servicio.
 
 Esta revisión distingue código existente de capacidades operativas. Las recomendaciones
 son criterios para evaluar; no autorizan por sí mismas despliegues, cambios de esquema,
@@ -33,7 +36,7 @@ mensajes a terceros ni la activación del motor. No se realizaron esas acciones.
 | 3. Auto-loop y memoria | Operativo para tareas nuevas; tres capas implementadas | Servicio Windows con identidad propia, corte de activación persistente, asignaciones SQL atómicas, renovación/cancelación, límites y memoria Markdown por cliente/proyecto con índice y respaldo diario. Prueba real: entrega desde memoria y tarea antigua intacta. La memoria de producción comienza vacía; las preferencias/manuales se cargan desde fuentes revisadas. Telegram/chats automáticos y barreras generales siguen separados. |
 | 4. Aprobación humana por Telegram | Operativa para solicitudes y publicación de esta app | Bot privado con botones, propietario/mensaje/nonce vinculados, plan inmutable con hash/destino/vencimiento y consumo único por ejecutor separado. Rechazo real bloqueó el consumo; aprobación real permitió continuar una tarea sintética; otra aprobación publicó el candidato IIS probado. SQL y Drive tienen ejecutores y pruebas de contrato, sin haber aplicado DDL ni subido documentos oficiales como prueba. |
 | 5. Optimización de tokens | Medición, presupuestos y contexto bajo demanda implementados | Uso acumulado por tarea/proyecto, reservas persistentes, límites antes de cada llamada y referencias completas por hash para entregables largos. Se mide la caché reportada por Codex. No hay proxy de herramientas ni reutilización semántica de respuestas; faltan mediciones comparables de ahorro real. Los presupuestos bloquean nuevas llamadas, no cortan exactamente una llamada en curso. |
-| 6. Barreras de seguridad | Parcial | Hay validación de rutas y enlaces, filtrado de archivos/credenciales, entorno reducido para Codex, sandbox solicitado, SQL restringido y configuración CMS. No se encontró un ejecutor central con bloqueo explícito de comandos destructivos ni integración de actividad del motor con Windows Event Log. |
+| 6. Barreras de seguridad | Operativas en el arnés; aislamiento arbitrario pendiente | Consola general deshabilitada, sandbox nativo de solo lectura, MCP de archivos limitado a la tarea y sus habilidades, rechazo de rutas/enlaces/secretos y cancelación inmediata ante denegación. Servicio sin administración, auditoría en Windows Event Log y escaneo antes de commit/push y en CI. Pruebas reales de edición permitida, canarios denegados y auditoría. No se habilita ejecución arbitraria local ni se promete ausencia de cualquier secreto histórico o auditoría externa inmutable. |
 
 ## 1. Roles y habilidades (revisión inicial)
 
@@ -131,7 +134,7 @@ Los entregables largos se conservan completos y se consultan bajo demanda. No se
 recortan requisitos ni aprobaciones. El manual enlazado distingue bytes y tokens,
 consumo reportado y reservado, caché del proveedor y respuestas reutilizadas.
 
-## 6. Seguridad y auditoría
+## 6. Seguridad y auditoría (revisión inicial)
 
 Evidencia: `safeFile` en [integraciones.mjs](../motor/integraciones.mjs),
 `codexEnvironment` y opciones de sandbox en el runner, [política SQL](../server/src/policy.mjs),
@@ -150,6 +153,14 @@ credenciales. Tampoco se leyeron `.env`, `motor/negocio.json` ni archivos de cre
 `app.AuditLog` registra escrituras de documentos y hay logs de servicio. Eso no cubre
 los comandos ejecutados por los agentes ni equivale a Windows Event Log. No se auditó
 la política completa de auditoría del sistema operativo.
+
+La implementación posterior cierra la consola general y ofrece edición controlada
+por MCP; QA solo puede leer. Se verificaron operaciones permitidas y rechazadas bajo
+la identidad virtual del servicio, con canarios intactos y eventos de Windows.
+El escaneo reconoce patrones de credenciales en refs locales y el índice Git,
+sin leer configuraciones privadas ni publicar coincidencias. El manual enlazado
+precisa los límites del escaneo, la rotación local y el aislamiento pendiente para
+ejecutar código arbitrario de clientes.
 
 ## Comprobaciones realizadas
 
