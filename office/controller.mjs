@@ -22,12 +22,12 @@ export async function officeTick({root,authorize,host,pauseTasks=async()=>{},res
    if(request.action==='close'){
     if(state.mode!=='open')throw new Error('invalid_state')
     const snapshot=await host('snapshot');atomicOfficeJson(snapshotPath,snapshot)
-    save({...state,mode:'closing',revision:state.revision+1,closedId:id,closedAt:request.createdAt,reopenAt:nextOpening(new Date(request.createdAt)),attempts:0})
+    save({...state,mode:'closing',revision:state.revision+1,closedId:id,closedBy:request.uid,closedAt:request.createdAt,reopenAt:nextOpening(new Date(request.createdAt)),attempts:0})
    }else{
     if(!['closed','error'].includes(state.mode))throw new Error('invalid_state')
-    save({...state,mode:'opening',revision:state.revision+1,requestId:id,attempts:0})
+    save({...state,mode:'opening',revision:state.revision+1,requestId:id,openedBy:request.uid,attempts:0})
    }
-   receipt(id,{accepted:true,mode:state.mode})
+   receipt(id,{accepted:true,mode:state.mode,action:request.action,actorUid:request.uid})
   }catch{receipt(id,{accepted:false,code:'office_command_rejected'})}
   finally{unlinkSync(file)}
  }
@@ -38,7 +38,7 @@ export async function officeTick({root,authorize,host,pauseTasks=async()=>{},res
   await pauseTasks(state.closedId)
   save({...state,mode:'closed',fullyClosedAt:now().toISOString()})
  }
- if(state.mode==='closed'&&state.autoResume!==false&&now().getTime()>=Date.parse(state.reopenAt))save({...state,mode:'opening',revision:state.revision+1,attempts:0})
+ if(state.mode==='closed'&&state.autoResume!==false&&now().getTime()>=Date.parse(state.reopenAt))save({...state,mode:'opening',revision:state.revision+1,openedBy:'scheduled-controller',attempts:0})
  if(state.mode==='opening'){
   try{
    if(!existsSync(snapshotPath))throw new Error('snapshot_missing')
