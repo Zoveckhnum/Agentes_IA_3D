@@ -16,7 +16,7 @@ La reapertura automática ocurre a las **07:00 del siguiente día civil**, zona 
 
 Usar un commit limpio y probado. Publicar la aplicación por el proceso CI/staging existente. Ejecutar `deploy/windows/Install-OfficeControl.ps1`, luego `office/setup-db.mjs` con el entorno CMS de mantenimiento de producción. El script de BD verifica al propietario humano existente antes de otorgarle CEO y crea un principal Windows con permisos mínimos de sesión y lectura, sin tablas nuevas. Iniciar StackBI-OfficeControl y comprobar `http://127.0.0.1:10014/_office/health` y el proxy en modo abierto.
 
-Ejecutar `deploy/windows/Update-OfficeTelegram.ps1`. Conservar una copia del web.config público y dirigir el destino de IIS de 10011 a 10014. Verificar HTTPS, inicio de sesión, permisos CEO, página de cierre móvil y escritorio. El cierre final se solicita desde una sesión humana real; no se fabrican cookies ni sesiones desde SQL.
+Ejecutar `deploy/windows/Update-OfficeTelegram.ps1` y `deploy/windows/Enable-OfficeProxy.ps1`. Este último respalda web.config, dirige IIS de 10011 a 10014, conserva el cuerpo de las respuestas 503 y revierte si falla la comprobación HTTPS/SQL. Verificar inicio de sesión, permisos CEO, página de cierre móvil y escritorio. El cierre final se solicita desde una sesión humana real; no se fabrican cookies ni sesiones desde SQL.
 
 El controlador solo recibe comandos tipados `open`/`close`, con revisión de estado, caducidad de dos minutos y una sesión vigente. Sus archivos privados y CMS de ejecución son exclusivos de SYSTEM y administradores. La cuenta del gateway no administra servicios, no modifica perfiles ni escribe el estado. Los registros evitan contraseñas, tokens y cookies.
 
