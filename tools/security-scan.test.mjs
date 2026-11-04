@@ -20,3 +20,8 @@ test('escáner excluye configuraciones privadas y diferencia plantillas sin leer
 test('un encabezado PEM de documentación sin cuerpo no se presenta como clave',()=>{
  const {root,git}=fixture();writeFileSync(join(root,'README.md'),'Ejemplo de encabezado: -----BEGIN PRIVATE KEY-----');git(['add','README.md']);git(['commit','-m','fixture documentation']);const {report}=scan(root);assert.equal(report.ok,true);assert.equal(report.findings.length,0)
 })
+test('el índice se revisa antes del primer commit sin imprimir el valor detectado',()=>{
+ const {root,git}=fixture(),secret='sk-'+randomBytes(48).toString('hex');writeFileSync(join(root,'file.txt'),secret);git(['add','file.txt'])
+ const result=spawnSync(process.execPath,[scanner,'--staged','--root',root],{encoding:'utf8',windowsHide:true}),report=JSON.parse(result.stdout)
+ assert.equal(result.status,1);assert.equal(report.head,'unborn');assert.equal(report.findings.length,1);assert.equal(result.stdout.includes(secret),false)
+})
