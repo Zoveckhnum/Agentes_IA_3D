@@ -1,16 +1,18 @@
 # Cierre de oficina por CEO humano
 
+Configuración elegida para esta oficina: **reapertura manual, exclusivamente por el CEO** (`autoResume: false`). No hay apertura automática a las 07:00. El aviso público y Telegram muestran el mismo texto fijo: «Oficina fuera de horario. Las actividades se retomarán cuando el CEO autorice la reapertura.»
+
 En Oficina, el botón **Cerrar oficina** aparece únicamente para una sesión humana cuyo perfil tiene `executiveRole: ceo`. El permiso se valida en el servidor y nuevamente en el controlador de Windows; el cargo editable, el rol admin por sí solo y el token del motor no autorizan el cierre. El propietario puede asignar o revocar este permiso desde Usuarios.
 
 Al confirmar, se bloquea el acceso de negocio, se deshabilitan nuevos trabajos del ejecutor humano y se espera a que termine cualquier operación privilegiada en curso. Se detienen AgentMotor, DeployBroker y ambas API Node; se detienen los sitios IIS de staging y preview. Se conserva una instantánea de sus estados y tipos de inicio. Las tareas activas con arrendamiento del motor se pausan sin borrar sus datos y se reencolan al reabrir.
 
 IIS público, Cloudflare Tunnel, SQL, respaldos, OfficeControl y HumanApprovals siguen activos para mostrar el aviso, conservar los datos y permitir la reapertura. No es un apagado de Windows. Mientras está cerrada, cualquier ruta pública de la aplicación devuelve HTTP 503, `Cache-Control: no-store` y `Retry-After` con:
 
-> Oficina fuera de horario, se retoman actividades a las 07:00 am del día siguiente.
+> Oficina fuera de horario. Las actividades se retomarán cuando el CEO autorice la reapertura.
 
 Telegram envía ese mismo texto al propietario y responde a sus mensajes con el texto fijo. No usa modelos ni procesa aprobaciones durante el cierre. Se permite registrar el resultado de una operación que ya estaba en ejecución. Si el envío inicial tiene un resultado incierto, se registra como `unknown` y no se repite automáticamente para evitar duplicados.
 
-La reapertura automática ocurre a las **07:00 del siguiente día civil**, zona `America/Mexico_City`, mediante una tarea SYSTEM que también comprueba el estado cada minuto y al arrancar Windows. No se cambia el corte de tareas nuevas del auto-loop. El equipo debe estar encendido y conectado; `StartWhenAvailable` recupera el horario si estuvo apagado. Un CEO puede entrar en el acceso de la página cerrada y reabrir antes. Tras tres fallos de reapertura, permanece cerrada para revisión.
+Opcionalmente, con `autoResume: true`, la reapertura automática ocurre a las **07:00 del siguiente día civil**, zona `America/Mexico_City`. La instalación predeterminada es manual; el controlador comprueba solicitudes CEO cada minuto y al arrancar Windows, sin abrir por horario. No se cambia el corte de tareas nuevas del auto-loop. Un CEO puede entrar en el acceso de la página cerrada y autorizar la apertura. Tras tres fallos de reapertura, permanece cerrada para revisión.
 
 ## Instalación y comprobación
 

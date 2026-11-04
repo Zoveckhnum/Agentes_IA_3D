@@ -5,7 +5,7 @@ import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {createServer} from 'node:http'
 import {createHash,randomUUID} from 'node:crypto'
-import {isHumanCeo,nextOpening,CLOSED_MESSAGE,atomicOfficeJson,readOfficeState,enqueueOfficeCommand} from './core.mjs'
+import {isHumanCeo,nextOpening,CLOSED_MESSAGE,MANUAL_CLOSED_MESSAGE,officeClosedMessage,publicOfficeState,atomicOfficeJson,readOfficeState,enqueueOfficeCommand} from './core.mjs'
 import {officeTick} from './controller.mjs'
 import {createOfficeGateway} from './gateway.mjs'
 import {authorizeWrite} from '../server/src/policy.mjs'
@@ -52,6 +52,16 @@ test('reapertura automática no ocurre antes de 07:00 ni con autoResume deshabil
  time=new Date('2026-11-04T13:00:00Z');assert.equal((await officeTick(options)).mode,'open');assert.deepEqual(calls,['start','resume-tasks','resume'])
  const manual=fixture({mode:'closed',autoResume:false,reopenAt:'2026-11-04T13:00:00Z'});assert.equal((await officeTick({...options,root:manual})).mode,'closed')
 })
+
+test('cierre manual conserva estado cerrado después de las 07:00 sin prometer horario',async()=>{
+ const root=fixture({autoResume:false}),calls=[]
+ enqueueOfficeCommand(root,{action:'close',actor,profile,sessionHash:actor.tokenHash,revision:0})
+ const options={root,authorize:async()=>true,host:async op=>{calls.push(op);return op==='busy'?{busy:false}:{}}}
+ const state=await officeTick(options);assert.equal(state.mode,'closed');assert.equal(state.reopenAt,null)
+ assert.equal(publicOfficeState(state).message,MANUAL_CLOSED_MESSAGE)
+ calls.length=0;await officeTick({...options,now:()=>new Date(Date.now()+3*86400000)});assert.equal(calls.length,0)
+ assert.equal(readOfficeState(join(root,'state','office.json')).mode,'closed')
+})
 test('reapertura fallida vuelve a detener trabajo y queda bloqueada después de tres intentos',async()=>{
  const root=fixture({mode:'opening',closedId:randomUUID()}),calls=[];atomicOfficeJson(join(root,'private','snapshot.json'),{})
  const options={root,authorize:async()=>false,host:async op=>{calls.push(op);if(op==='start')throw new Error('health failed');return {}},pauseTasks:async()=>calls.push('pause')}
@@ -79,10 +89,13 @@ test('gateway valida rol y origen en servidor; cerrado sirve 503 sin caché y no
   const page=await fetch(base+'/cualquier/ruta');assert.equal(page.status,503);assert.match(page.headers.get('cache-control'),/no-store/);assert.ok((await page.text()).includes(CLOSED_MESSAGE))
   const api=await fetch(base+'/api/data/read');assert.equal(api.status,503);assert.equal((await api.json()).message,CLOSED_MESSAGE)
   const status=await fetch(base+'/_office/status',{headers:{Cookie:'ceo'}});assert.equal((await status.json()).canControl,true)
+  atomicOfficeJson(join(root,'state','office.json'),{format:'stackbi-office-state-v1',mode:'closed',revision:2,autoResume:false,reopenAt:'2026-11-04T13:00:00Z'})
+  const manual=await fetch(base+'/oficina');assert.equal(manual.status,503);assert.ok((await manual.text()).includes(MANUAL_CLOSED_MESSAGE))
+  const manualStatus=await (await fetch(base+'/_office/status')).json();assert.equal(manualStatus.reopenAt,null);assert.equal(manualStatus.autoResume,false)
  }finally{server.closeAllConnections();await new Promise(r=>server.close(r))}
 })
-test('Telegram cerrado anuncia y responde el mismo texto sin autorizar ni invocar IA',async()=>{
- const root=fixture({mode:'closed',revision:1,closedId:randomUUID(),reopenAt:'2026-11-04T13:00:00Z'});mkdirSync(join(root,'registry'))
+for(const autoResume of [true,false])test('Telegram cerrado anuncia y responde sin IA; autoResume='+autoResume,async()=>{
+ const root=fixture({mode:'closed',revision:1,autoResume,closedId:randomUUID(),reopenAt:'2026-11-04T13:00:00Z'});mkdirSync(join(root,'registry'))
  const sent=[];let delivered=false,resolveMessages;const complete=new Promise(r=>{resolveMessages=r})
  const fetchImpl=async(url,{body,signal})=>{
   const method=url.split('/').at(-1),data=JSON.parse(body)
@@ -97,7 +110,7 @@ test('Telegram cerrado anuncia y responde el mismo texto sin autorizar ni invoca
  const address=await service.start()
  try{
   await Promise.race([complete,new Promise((_,reject)=>setTimeout(()=>reject(new Error('notification timeout')),1500))])
-  assert.equal(sent.length,2);assert.ok(sent.every(m=>m.text===CLOSED_MESSAGE&&String(m.chat_id)==='1234'))
+  assert.equal(sent.length,2);assert.ok(sent.every(m=>m.text===officeClosedMessage({autoResume})&&String(m.chat_id)==='1234'))
   const response=await fetch('http://127.0.0.1:'+address.port+'/request',{method:'POST',headers:{Authorization:'Bearer submit','Content-Type':'application/json'},body:'{}'});assert.equal(response.status,503)
   const approved=await fetch('http://127.0.0.1:'+address.port+'/approved',{headers:{Authorization:'Bearer execute'}});assert.deepEqual(await approved.json(),{requests:[]})
   assert.equal(JSON.parse(readFileSync(join(root,'state','office-notice.json'))).status,'delivered')

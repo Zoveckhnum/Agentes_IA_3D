@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$RepositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,[bool]$AutoResume=$true)
+param([string]$RepositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,[bool]$AutoResume=$false)
 $ErrorActionPreference='Stop'
 $root='C:\ProgramData\StackBI\OfficeControl';$service='StackBI-OfficeControl';$identity='NT SERVICE\'+$service
 if((Test-Path $root) -or (Get-Service $service -ErrorAction SilentlyContinue)){throw 'La instalación ya existe; revisar antes de sustituirla'}
@@ -49,5 +49,6 @@ $repeat=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionI
 $daily=New-ScheduledTaskTrigger -Daily -At '07:00';$boot=New-ScheduledTaskTrigger -AtStartup
 $principal=New-ScheduledTaskPrincipal -UserId SYSTEM -LogonType ServiceAccount -RunLevel Highest
 $settings=New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -MultipleInstances IgnoreNew
-Register-ScheduledTask -TaskName StackBI-OfficeController -Action $action -Trigger @($repeat,$daily,$boot) -Principal $principal -Settings $settings|Out-Null
+$triggers=if($AutoResume){@($repeat,$daily,$boot)}else{@($repeat,$boot)}
+Register-ScheduledTask -TaskName StackBI-OfficeController -Action $action -Trigger $triggers -Principal $principal -Settings $settings|Out-Null
 @{installed=$true;service=$service;controller='StackBI-OfficeController';gatewayPort=10014;autoResume=$AutoResume;requiresDatabaseProvision=$true;publicProxyUnchanged=$true}|ConvertTo-Json -Compress

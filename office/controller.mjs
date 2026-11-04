@@ -22,7 +22,7 @@ export async function officeTick({root,authorize,host,pauseTasks=async()=>{},res
    if(request.action==='close'){
     if(state.mode!=='open')throw new Error('invalid_state')
     const snapshot=await host('snapshot');atomicOfficeJson(snapshotPath,snapshot)
-    save({...state,mode:'closing',revision:state.revision+1,closedId:id,closedBy:request.uid,closedAt:request.createdAt,reopenAt:nextOpening(new Date(request.createdAt)),attempts:0})
+    save({...state,mode:'closing',revision:state.revision+1,closedId:id,closedBy:request.uid,closedAt:request.createdAt,reopenAt:state.autoResume===false?null:nextOpening(new Date(request.createdAt)),attempts:0})
    }else{
     if(!['closed','error'].includes(state.mode))throw new Error('invalid_state')
     save({...state,mode:'opening',revision:state.revision+1,requestId:id,openedBy:request.uid,attempts:0})

@@ -3,6 +3,8 @@ import {join} from 'node:path'
 import {randomUUID} from 'node:crypto'
 export const ZONE='America/Mexico_City'
 export const CLOSED_MESSAGE='Oficina fuera de horario, se retoman actividades a las 07:00 am del día siguiente.'
+export const MANUAL_CLOSED_MESSAGE='Oficina fuera de horario. Las actividades se retomarán cuando el CEO autorice la reapertura.'
+export const officeClosedMessage=state=>state.autoResume===false?MANUAL_CLOSED_MESSAGE:CLOSED_MESSAGE
 export function nextOpening(now=new Date()){
  const parts=date=>Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:ZONE,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(date).filter(p=>p.type!=='literal').map(p=>[p.type,Number(p.value)]))
  const p=parts(now),day=new Date(Date.UTC(p.year,p.month-1,p.day+1)),target=Date.UTC(day.getUTCFullYear(),day.getUTCMonth(),day.getUTCDate(),7)
@@ -20,7 +22,7 @@ export function readOfficeState(file){
  return state
 }
 export const officeUnavailable=state=>state.mode!=='open'
-export function publicOfficeState(state){return {mode:state.mode,revision:state.revision,message:state.mode==='open'?'Oficina abierta.':CLOSED_MESSAGE,reopenAt:state.reopenAt||null,timeZone:ZONE,autoResume:state.autoResume!==false}}
+export function publicOfficeState(state){return {mode:state.mode,revision:state.revision,message:state.mode==='open'?'Oficina abierta.':officeClosedMessage(state),reopenAt:state.autoResume===false?null:state.reopenAt||null,timeZone:ZONE,autoResume:state.autoResume!==false}}
 export function atomicOfficeJson(file,value){const temp=file+'.'+randomUUID()+'.tmp',fd=openSync(temp,'wx');try{writeFileSync(fd,JSON.stringify(value)+'\n');fsyncSync(fd)}finally{closeSync(fd)}renameSync(temp,file)}
 export function enqueueOfficeCommand(root,{action,actor,profile,sessionHash,revision,now=new Date()}){
  if(!isHumanCeo(actor,profile)||!actor.tokenHash||sessionHash!==actor.tokenHash||!/^[a-f0-9]{64}$/.test(sessionHash))throw new Error('office_ceo_required')

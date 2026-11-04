@@ -5,7 +5,7 @@ import {join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {createDatabase,sql} from '../server/src/db.mjs'
 import {createAuth} from '../server/src/auth.mjs'
-import {readOfficeState,publicOfficeState,isHumanCeo,enqueueOfficeCommand,CLOSED_MESSAGE} from './core.mjs'
+import {readOfficeState,publicOfficeState,isHumanCeo,enqueueOfficeCommand,officeClosedMessage} from './core.mjs'
 const require=createRequire(new URL('../server/package.json',import.meta.url)),express=require('express'),helmet=require('helmet')
 
 export function createOfficeGateway({root,database,origin='https://stackbi.com.mx',authConfig,upstreamPort=10011,now=()=>new Date(),authOverride,profileOverride}){
@@ -32,11 +32,11 @@ export function createOfficeGateway({root,database,origin='https://stackbi.com.m
  })
  app.use('/_office',(_req,res)=>res.status(404).json({error:{code:'not-found'}}))
  app.use((req,res)=>{
-  let state;try{state=readOfficeState(stateFile)}catch{state={mode:'error'}}
+  let state;try{state=readOfficeState(stateFile)}catch{state={mode:'error',autoResume:false}}
   if(state.mode!=='open'){
    res.set('Retry-After',String(Math.max(60,Math.ceil(((Date.parse(state.reopenAt)||now().getTime()+60000)-now().getTime())/1000))))
-   if(req.url.startsWith('/api/')||req.url.startsWith('/health'))return res.status(503).json({error:{code:'office-closed',message:CLOSED_MESSAGE},...publicOfficeState({...state,revision:state.revision||0})})
-   return res.status(503).type('html').send(readFileSync(join(assetRoot,'closed.html'),'utf8'))
+   if(req.url.startsWith('/api/')||req.url.startsWith('/health'))return res.status(503).json({error:{code:'office-closed',message:officeClosedMessage(state)},...publicOfficeState({...state,revision:state.revision||0})})
+   return res.status(503).type('html').send(readFileSync(join(assetRoot,'closed.html'),'utf8').replace('__OFFICE_MESSAGE__',officeClosedMessage(state)))
   }
   if(req.headers.authorization)return res.status(403).json({error:{code:'permission-denied',message:'Acceso interno no disponible en la URL pública.'}})
   const upstream=httpRequest({host:'127.0.0.1',port:upstreamPort,path:req.originalUrl,method:req.method,headers:{...req.headers,'x-forwarded-proto':new URL(origin).protocol.slice(0,-1)}},response=>{res.status(response.statusCode||502);for(const [key,value]of Object.entries(response.headers))if(value!==undefined&&!['connection','transfer-encoding','cache-control'].includes(key))res.setHeader(key,value);response.pipe(res)})
