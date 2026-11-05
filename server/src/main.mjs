@@ -33,7 +33,7 @@ export function createApplication(database, config, dependencies = {}) {
     next()
   })
   app.use('/api', express.json({ limit: config.maxBodyBytes, strict: true }))
-  app.use('/api/integrations/portal',createPortalBridge({repository,configuration:config.portalBridgeConfiguration}))
+  app.use('/api/integrations/portal',createPortalBridge({repository,configuration:config.portalBridgeConfiguration,officeOrigin:config.origin}))
   app.post('/api/auth/login', async (req, res) => res.json({ user: await auth.login(req, res) }))
   app.post('/api/auth/register', async (req, res) => res.json(await auth.register(req)))
   app.use('/api', async (req, _res, next) => { try { req.actor = await auth.actor(req); next() } catch (error) { next(error) } })
