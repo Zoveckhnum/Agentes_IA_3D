@@ -8,9 +8,12 @@ import { createDatabase, sql } from './db.mjs'
 import { createRepository } from './repository.mjs'
 import { createAuth } from './auth.mjs'
 import { ApiError } from './values.mjs'
+import {createPortalBridge} from './portal-bridge.mjs'
+import { createAccountSecurity } from './account-security.mjs'
 
-export function createApplication(database, config) {
+export function createApplication(database, config, dependencies = {}) {
   const app = express(), repository = createRepository(database, config.maxDocuments, config.ownerUid), auth = createAuth(database, config)
+  const security = createAccountSecurity(database, config, dependencies.sendSecurityMail)
   app.disable('x-powered-by')
   app.set('trust proxy', 'loopback')
   app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'], imgSrc: ["'self'", 'data:', 'https:'], connectSrc: ["'self'"], fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'], upgradeInsecureRequests: config.secureCookies ? [] : null } } }))
@@ -30,6 +33,7 @@ export function createApplication(database, config) {
     next()
   })
   app.use('/api', express.json({ limit: config.maxBodyBytes, strict: true }))
+  app.use('/api/integrations/portal',createPortalBridge({repository,configuration:config.portalBridgeConfiguration}))
   app.post('/api/auth/login', async (req, res) => res.json({ user: await auth.login(req, res) }))
   app.post('/api/auth/register', async (req, res) => res.json(await auth.register(req)))
   app.use('/api', async (req, _res, next) => { try { req.actor = await auth.actor(req); next() } catch (error) { next(error) } })
@@ -38,7 +42,9 @@ export function createApplication(database, config) {
     res.json({ user })
   })
   app.post('/api/auth/logout', async (req, res) => { await auth.logout(req.actor, res); res.json({ ok: true }) })
-  app.post('/api/auth/password', async (req, res) => { await auth.changePassword(req.actor, req.body, res); res.json({ ok: true }) })
+  app.post('/api/auth/security/request', async (req, res) => res.json(await security.request(req.actor, req.body)))
+  app.post('/api/auth/password', async (req, res) => { await security.confirm(req.actor, req.body, 'password'); auth.clearSessionCookie(res); res.json({ ok: true }) })
+  app.post('/api/auth/email', async (req, res) => { await security.confirm(req.actor, req.body, 'email'); auth.clearSessionCookie(res); res.json({ ok: true }) })
   app.use('/api', (req, _res, next) => req.actor.mustChangePassword ? next(new ApiError(403, 'auth/password-change-required')) : next())
   app.post('/api/data/read', async (req, res) => res.json(await repository.read(req.actor, req.body)))
   app.get('/api/worker/capabilities', (req, res, next) => req.actor.worker ? res.json({ atomicClaims: true, version: 1 }) : next(new ApiError(403, 'permission-denied')))
@@ -63,7 +69,7 @@ if (import.meta.url === new URL(process.argv[1], 'file:').href || process.argv[1
   const app = createApplication(database, config)
   const server = app.listen(config.port, config.host, () => console.log(JSON.stringify({ event: 'api_listening', host: config.host, port: config.port })))
   const maintenance = setInterval(async () => {
-    try { await new sql.Request(await database.pool()).query('DELETE TOP (10000) FROM app.Sessions WHERE ExpiresAt<SYSUTCDATETIME(); DELETE TOP (10000) FROM app.Commits WHERE CreatedAt<DATEADD(day,-30,SYSUTCDATETIME()); DELETE TOP (10000) FROM app.AuditLog WHERE CreatedAt<DATEADD(day,-90,SYSUTCDATETIME())') } catch { console.error(JSON.stringify({ event: 'maintenance_failed' })) }
+    try { await new sql.Request(await database.pool()).query('DELETE TOP (10000) FROM app.Sessions WHERE ExpiresAt<SYSUTCDATETIME(); DELETE TOP (10000) FROM app.Commits WHERE CreatedAt<DATEADD(day,-30,SYSUTCDATETIME()); DELETE TOP (10000) FROM app.AuditLog WHERE CreatedAt<DATEADD(day,-90,SYSUTCDATETIME()); DELETE TOP (10000) FROM app.AccountVerifications WHERE CreatedAt<DATEADD(day,-2,SYSUTCDATETIME())') } catch { console.error(JSON.stringify({ event: 'maintenance_failed' })) }
   }, 3600e3).unref()
   let stopping = false
   const stop = () => { if (stopping) return; stopping = true; clearInterval(maintenance); const timeout = setTimeout(() => process.exit(1), 15000).unref(); server.close(async () => { await database.close().catch(() => {}); clearTimeout(timeout); process.exit(0) }) }

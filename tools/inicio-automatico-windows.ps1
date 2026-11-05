@@ -9,6 +9,6 @@ $lnk = $shell.CreateShortcut($lnkPath)
 $lnk.TargetPath = Join-Path $motor 'iniciar-agentes.bat'
 $lnk.WorkingDirectory = $motor
 $lnk.WindowStyle = 7
-$lnk.Description = 'Motor de agentes de Agentes IA 3D'
+$lnk.Description = 'Motor de agentes de Stackbi Office'
 $lnk.Save()
 Write-Output "Inicio automatico configurado: $lnkPath"

@@ -6,6 +6,7 @@ import { migrateSchema } from './migrate-schema.mjs'
 import { passwordDigest } from '../src/passwords.mjs'
 import { createApplication } from '../src/main.mjs'
 import {verifyOfficeIntegration} from '../../office/sql-integration.mjs'
+import { verifyAccountSecurity } from './account-security-integration.mjs'
 
 const name = `AgentesIA3D_Test_${randomBytes(5).toString('hex')}`
 const master = createDatabase(databaseConfig({ ...process.env, CORE_DB_NAME: 'master' }))
@@ -31,7 +32,12 @@ try {
   await seed('chats/employee_other/messages/one', { text: 'private', from: 'employee' })
   await seed('chats/other_owner/messages/two', { text: 'not-for-employee', from: 'owner' })
   const config = { origin: '', secureCookies: false, workerToken: randomBytes(48).toString('base64url'), workerUid: 'worker', workerEmail: 'worker@test.invalid', ownerUid: 'owner', maxDocuments: 5000, maxBodyBytes: 2 * 1024 * 1024 }
-  const app = createApplication(database, config)
+  config.securityCodeSecret = randomBytes(32).toString('hex')
+  const securityMessages = []
+  const app = createApplication(database, config, { sendSecurityMail: async message => {
+    if (config.failSecurityMail) throw new Error('Synthetic delivery failure')
+    securityMessages.push(message)
+  } })
   server = app.listen(0, '127.0.0.1')
   await new Promise(resolve => server.once('listening', resolve))
   config.origin = `http://127.0.0.1:${server.address().port}`
@@ -95,7 +101,9 @@ try {
   const newUser = (await call('/api/auth/me', undefined, 'new')).json.user
   check((await read(`users/${newUser.uid}`, 'new')).json.data.role, 'empleado')
   const changed = password + '-changed'
-  check((await call('/api/auth/password', { password: changed }, 'pending')).status, 200)
+  const verification = await call('/api/auth/security/request', { purpose: 'password', currentPassword: password }, 'pending')
+  check(verification.status, 200)
+  check((await call('/api/auth/password', { password: changed, id: verification.json.id, code: securityMessages.at(-1).code }, 'pending')).status, 200)
   check((await call('/api/auth/me', undefined, 'pending')).status, 401)
   check((await call('/api/auth/login', { email: 'pending@test.invalid', password: changed }, 'pending')).status, 200)
   check((await call('/api/data/read', { kind: 'collection', path: 'tasks' }, 'pending')).status, 403)
@@ -103,6 +111,8 @@ try {
   check((await commit([{type:'update',path:'users/owner',data:{executiveRole:'ceo'}}],null,randomUUID(),leaseHeaders)).status,403)
   check((await commit([{type:'update',path:'users/owner',data:{executiveRole:'ceo'}}])).status,200)
   assertions+=await verifyOfficeIntegration({database,config,cookies,password})
+  check((await call('/api/auth/login', { email: 'other@test.invalid', password }, 'other')).status, 200)
+  assertions += await verifyAccountSecurity({ database, call, password, messages: securityMessages, config })
   await new sql.Request(pool).query("UPDATE dbo.SchemaMigrations SET SHA256=REPLICATE('0',64) WHERE Name='001-initial.sql'")
   await assert.rejects(migrateSchema(database), /migración aplicada/); assertions++
   const invalidConfig = databaseConfig(process.env)

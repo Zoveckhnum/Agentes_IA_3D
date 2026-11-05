@@ -248,6 +248,9 @@ export default function UsersAdmin() {
                     {u.email || 'Cuenta incompleta: elimínala, se reparará al volver a entrar'}
                     {u.position && <span style={{ marginLeft: 8 }}>· {u.position}</span>}
                   </div>
+                  {(u.contactEmail || u.phone) && <div style={{ fontSize: 12, color: 'var(--text-3)', overflowWrap: 'anywhere' }}>
+                    {[u.contactEmail, u.phone].filter(Boolean).join(' · ')}
+                  </div>}
                 </div>
 
                 <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'right', flexShrink: 0 }}>
@@ -274,7 +277,7 @@ export default function UsersAdmin() {
                 {/* Editar perfil (cualquier admin puede editar; super admin edita a todos) */}
                 {(isSuperAdmin || u.role !== 'admin' || u.uid === user?.uid) && (
                   <button className="btn btn-ghost btn-sm btn-icon" style={{ flexShrink: 0 }}
-                    onClick={() => setEditingUser(u)} title="Editar perfil">
+                    onClick={() => setEditingUser(u)} title="Editar perfil y contacto" aria-label={`Editar perfil y contacto de ${u.name || u.email}`}>
                     ✎
                   </button>
                 )}
@@ -440,7 +443,7 @@ function InviteModal({ onClose, showToast, isSuperAdmin }) {
 function EditUserModal({ target, onClose, showToast, isSuperAdmin }) {
   const [form, setForm] = useState({
     name: target.name || '',
-    email: target.email || '',
+    contactEmail: target.contactEmail ?? target.email ?? '',
     position: target.position || '',
     executiveRole: target.executiveRole || '',
     phone: target.phone || '',
@@ -450,19 +453,20 @@ function EditUserModal({ target, onClose, showToast, isSuperAdmin }) {
 
   const handleSave = async () => {
     if (!form.name.trim()) { showToast('El nombre no puede estar vacío', 'error'); return }
+    const contactEmail = form.contactEmail.trim().toLowerCase()
+    if (contactEmail && (contactEmail.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail))) {
+      showToast('Ingresa un correo de contacto válido o deja el campo vacío', 'error'); return
+    }
     setSaving(true)
     try {
       const updates = {
         name: form.name.trim(),
         position: form.position.trim(),
         phone: form.phone.trim(),
+        contactEmail,
         bio: form.bio.trim(),
       }
       if(isSuperAdmin)updates.executiveRole=form.executiveRole||null
-      // Solo el Super Admin puede cambiar el correo de contacto
-      if (isSuperAdmin && form.email.trim()) {
-        updates.email = form.email.trim().toLowerCase()
-      }
       await updateDoc(doc(db, 'users', target.uid), updates)
       showToast(`Perfil de ${form.name} actualizado`)
       onClose()
@@ -485,17 +489,14 @@ function EditUserModal({ target, onClose, showToast, isSuperAdmin }) {
             <input className="form-input" value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           </div>
-          {isSuperAdmin && (
-            <div className="form-group">
-              <label className="form-label">Correo</label>
-              <input className="form-input" type="email" value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-              <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                Cambia el correo de contacto y notificaciones. El inicio de sesión
-                sigue siendo con su cuenta de Google original.
-              </span>
-            </div>
-          )}
+          <div className="form-group">
+            <label className="form-label" htmlFor="user-contact-email">Correo de contacto</label>
+            <input id="user-contact-email" className="form-input" type="email" autoComplete="email" maxLength={320} value={form.contactEmail}
+              onChange={e => setForm(f => ({ ...f, contactEmail: e.target.value }))} aria-describedby="user-login-email" />
+            <span id="user-login-email" style={{ fontSize: 12, color: 'var(--text-2)', overflowWrap: 'anywhere' }}>
+              Correo de acceso: {target.email}. Cambiar el contacto conserva el acceso con esa cuenta.
+            </span>
+          </div>
           <div className="form-group">
             <label className="form-label">Cargo</label>
             <input className="form-input" value={form.position}
@@ -504,8 +505,8 @@ function EditUserModal({ target, onClose, showToast, isSuperAdmin }) {
           </div>
           {isSuperAdmin&&<div className="form-group"><label className="form-label">Permiso de dirección</label><select className="form-input" value={form.executiveRole} onChange={e=>setForm(f=>({...f,executiveRole:e.target.value}))}><option value="">Sin control de cierre</option><option value="ceo">CEO · cerrar y abrir la oficina</option></select><p style={{fontSize:12,marginTop:6}}>Solo aplica a una cuenta humana activa. El texto del cargo no concede este permiso.</p></div>}
           <div className="form-group">
-            <label className="form-label">Teléfono</label>
-            <input className="form-input" value={form.phone}
+            <label className="form-label" htmlFor="user-contact-phone">Teléfono</label>
+            <input id="user-contact-phone" className="form-input" type="tel" autoComplete="tel" value={form.phone}
               onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
           </div>
           <div className="form-group">

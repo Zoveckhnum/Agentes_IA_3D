@@ -1,4 +1,4 @@
-// Motor de agentes de Agentes IA 3D
+// Motor de agentes de Stackbi Office
 // Corre en tu PC: escucha la app (Firestore) y ejecuta con OpenAI Codex las tareas asignadas
 // a los agentes activos. Nada se publica ni se envía: cada entrega queda en
 // "Espera Aprobación" para que el dueño la revise.

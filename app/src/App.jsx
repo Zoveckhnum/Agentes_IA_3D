@@ -353,7 +353,7 @@ export default function App() {
         {/* Footer */}
         <footer className="app-footer">
           <span>{BRAND.appName} v{APP_VERSION}</span>
-          <span><strong>{BRAND.company}</strong> © {new Date().getFullYear()} · Hecho con <a href="https://github.com/ederland/Agentes_IA_3D" target="_blank" rel="noreferrer">Agentes IA 3D</a> (código abierto)</span>
+          <span><strong>{BRAND.company}</strong> © {new Date().getFullYear()} · Hecho con <a href="https://github.com/ederland/Agentes_IA_3D" target="_blank" rel="noreferrer">Stackbi Office</a> (código abierto)</span>
         </footer>
 
         <PomodoroWidget />

@@ -22,7 +22,7 @@ export function databaseConfig(env = process.env) {
   const connectionString = [
     `Driver=${brace(driver)}`, `Server=${brace(`tcp:${server},${integer(env.CORE_DB_PORT, 'CORE_DB_PORT', 1, 65535)}`)}`,
     `Database=${brace(database)}`, 'Trusted_Connection=Yes', 'Encrypt=Yes', 'TrustServerCertificate=No',
-    'ApplicationIntent=ReadWrite', 'APP={Agentes IA 3D}',
+    'ApplicationIntent=ReadWrite', 'APP={Stackbi Office}',
   ].join(';') + ';'
   return { connectionString, connectionTimeout: 10000, requestTimeout: 15000, pool: { min: 0, max: 3, idleTimeoutMillis: 30000 } }
 }
@@ -39,5 +39,8 @@ export function applicationConfig(env = process.env) {
     ownerUid: required(env, 'APP_OWNER_UID'),
     maxDocuments: 5000, maxBodyBytes: 2 * 1024 * 1024,
     staticRoot: env.APP_STATIC_ROOT || '',
+    securityCodeSecret: env.APP_SECURITY_CODE_SECRET || '',
+    ownerEmailRecovery: env.APP_OWNER_EMAIL_RECOVERY ? JSON.parse(env.APP_OWNER_EMAIL_RECOVERY) : null,
+    securityMail: { apiKey: env.APP_BREVO_API_KEY || '', sender: env.APP_MAIL_SENDER || '', senderName: env.APP_MAIL_SENDER_NAME || 'Stackbi Office' },
   }
 }

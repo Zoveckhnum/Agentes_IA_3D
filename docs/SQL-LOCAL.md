@@ -37,7 +37,43 @@ Configuración y credencial del adaptador del motor: paquetes CMS bajo
 El lanzador descifra únicamente en memoria y no imprime valores. No se copiaron
 los archivos .env ni negocio.json del proyecto original.
 
+## Edición de datos de contacto
+
+Cada usuario puede editar su nombre, correo de contacto y teléfono desde **Mi Perfil**.
+Los administradores también pueden hacerlo desde **Usuarios**, con el botón
+**Editar perfil y contacto**, respetando los permisos de edición existentes.
+El correo de contacto se guarda en `contactEmail`; `email` conserva la identidad
+de acceso. Los perfiles existentes muestran inicialmente su correo de acceso como
+contacto, sin requerir una migración. El contacto se puede dejar vacío.
+
 ## Datos y autenticación
+
+En **Mi Perfil → Acceso y seguridad** se puede cambiar el correo de acceso o la
+contraseña. Ambas acciones requieren la contraseña actual y códigos de 8 dígitos,
+válidos durante 10 minutos y con un máximo de 5 intentos. Para cambiar el correo
+se verifica tanto la dirección actual como la nueva. Los códigos no se guardan
+en texto claro ni se devuelven al navegador. Cada nueva solicitud invalida las
+anteriores y tiene un intervalo mínimo de un minuto y máximo de 5 por 15 minutos.
+Al completar el cambio se invalidan todas las sesiones. Se conserva el UID, el
+rol y la asignación de tareas; el correo de contacto permanece independiente.
+El cambio obligatorio de contraseña también usa verificación por correo.
+
+Los envíos usan Brevo mediante `APP_BREVO_API_KEY`, `APP_MAIL_SENDER`,
+`APP_MAIL_SENDER_NAME` y `APP_SECURITY_CODE_SECRET` en el entorno CMS protegido.
+`Configure-AccountMail.ps1` importa la clave sin imprimirla y comprueba el remitente.
+`variables.md` está excluido de Git. La migración `003-account-verifications.sql`
+añade la tabla privada de verificaciones; no se publica mediante la API documental.
+Las pruebas de integración usan una base temporal y un remitente simulado, sin
+enviar mensajes reales ni modificar cuentas de producción.
+
+Para activar el correo real del propietario migrado desde una cuenta `.local`
+sin verificar, el operador puede ejecutar `Authorize-DemoEmailRecovery.ps1`
+con `-TargetEmail` y la dirección confirmada por el propietario. La autorización
+se guarda cifrada en `APP_OWNER_EMAIL_RECOVERY`, dura 24 horas y se limita al UID
+del propietario, correo de origen, destino y versión de credenciales exactos.
+El usuario aún debe introducir su contraseña actual y el código recibido en el
+correo real. No se envían códigos al correo `.local`. Al completar el cambio la
+autorización deja de aplicar y los cambios posteriores verifican ambos correos.
 
 Se conservaron los 46 documentos y las 2 cuentas de la exportación local existente:
 agentChats 13, agents 15, config 1, tasks 12, users 1 y worklog 4.

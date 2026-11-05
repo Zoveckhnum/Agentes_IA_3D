@@ -11,6 +11,7 @@ server/.test-artifacts/
 
 # Secretos y configuración de cada negocio (nunca se suben)
 .env
+/variables.md
 .env.*
 !.env.example
 motor/negocio.json

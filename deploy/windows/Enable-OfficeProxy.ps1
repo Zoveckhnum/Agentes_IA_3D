@@ -6,11 +6,14 @@ $path='C:\inetpub\stackbi-agentes-public\web.config'
 $health=Invoke-RestMethod http://127.0.0.1:10014/_office/health -TimeoutSec 10
 if(-not $health.ok -or -not $health.permissionsRestricted -or $health.mode -ne 'open'){throw 'El control no está listo para activar el proxy'}
 $before=[IO.File]::ReadAllText($path);$config=[xml]$before
-$action=$config.SelectSingleNode('/configuration/system.webServer/rewrite/rules/rule[@name="Agentes IA 3D public proxy"]/action')
+$actions=$config.SelectNodes('/configuration/system.webServer/rewrite/rules/rule[match/@url="(.*)"]/action[@type="Rewrite"]')
+if($actions.Count -ne 1){throw 'Se requiere una única regla de proxy público'}
+$action=$actions[0]
 if(-not $action -or $action.url -notin @('http://127.0.0.1:10011/{R:1}','http://127.0.0.1:10014/{R:1}')){throw 'Destino IIS inesperado'}
 $backup=Join-Path $root 'private\public-web.config.before-office'
 if(-not(Test-Path -LiteralPath $backup)){Copy-Item -LiteralPath $path -Destination $backup}
 try{
+ $action.ParentNode.SetAttribute('name','Stackbi Office public proxy')
  $action.SetAttribute('url','http://127.0.0.1:10014/{R:1}')
  $config.SelectSingleNode('/configuration/system.webServer/httpErrors').SetAttribute('existingResponse','PassThrough')
  $config.Save($path)

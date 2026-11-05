@@ -84,14 +84,7 @@ export function createAuth(database, config) {
       if (!actor.worker) await new sql.Request(await database.pool()).input('hash', sql.Char(64), actor.tokenHash).query('DELETE FROM app.Sessions WHERE TokenHash=@hash')
       res.clearCookie(cookieName, cookieOptions)
     },
-    async changePassword(actor, body, res) {
-      if (actor.worker || Date.now() - new Date(actor.sessionCreatedAt).getTime() > 5 * 60e3) throw new ApiError(401, 'auth/requires-recent-login')
-      const password = body?.password
-      if (typeof password !== 'string' || password.length < 12 || password.length > 256 || password.toLowerCase().includes('solo-emulador')) throw new ApiError(400, 'auth/weak-password', 'Usa una contraseña nueva de al menos 12 caracteres.')
-      const digest = await passwordDigest(password)
-      await new sql.Request(await database.pool()).input('uid', sql.NVarChar(128), actor.uid).input('digest', sql.VarChar(300), digest)
-        .query('UPDATE app.Accounts SET PasswordDigest=@digest,MustChangePassword=0,CredentialVersion=CredentialVersion+1 WHERE Uid=@uid; DELETE FROM app.Sessions WHERE Uid=@uid')
-      res.clearCookie(cookieName, cookieOptions)
-    },
+    clearSessionCookie(res) { res.clearCookie(cookieName, cookieOptions) },
+
   }
 }

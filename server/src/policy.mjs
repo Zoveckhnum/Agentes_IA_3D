@@ -31,7 +31,8 @@ export async function authorizeWrite(actor, operation, before, after, lookup) {
       if (deleting) allowed = admin && actor.uid !== id && before?.isSuper !== true
       else if (create) allowed = actor.uid === id && after.email === actor.email && after.role === 'pending' && !after.isSuper
       else if (admin) allowed = (actor.isSuper || (!keys.has('isSuper') && (!keys.has('role') || (before.role !== 'admin' && after.role !== 'admin')))) && (!before?.isSuper || actor.uid === id) && !keys.has('email')
-      else allowed = actor.uid === id && after.email === actor.email && only(keys, ['name', 'photo', 'phone', 'bio', 'position', 'color', 'lastSeen', 'look'])
+      else allowed = actor.uid === id && after.email === actor.email && only(keys, ['name', 'photo', 'phone', 'contactEmail', 'bio', 'position', 'color', 'lastSeen', 'look'])
+      if (keys.has('contactEmail') && (typeof after?.contactEmail !== 'string' || after.contactEmail.length > 320 || (after.contactEmail !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(after.contactEmail)))) allowed = false
       if (after && !['admin', 'empleado', 'pending'].includes(after.role)) allowed = false
       if(keys.has('executiveRole')&&(!admin||!actor.isSuper||actor.worker||create||deleting))allowed=false
       if(after?.executiveRole!==undefined&&!['ceo',null].includes(after.executiveRole))allowed=false

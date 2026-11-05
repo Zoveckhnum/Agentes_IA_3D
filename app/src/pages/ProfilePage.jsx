@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react'
 import { useApp } from '../App.jsx'
 import { db } from '../firebase.js'
 import { doc, updateDoc } from '../data/firestore.js'
+import { useLocalSql } from '../data/mode.js'
+import AccountSecurity from '../components/AccountSecurity.jsx'
 
 function fmtDate(ts) {
   if (!ts) return '—'
@@ -20,6 +22,7 @@ export default function ProfilePage() {
     name: userProfile?.name || '',
     position: userProfile?.position || '',
     phone: userProfile?.phone || '',
+    contactEmail: userProfile?.contactEmail ?? userProfile?.email ?? '',
     bio: userProfile?.bio || '',
     photo: userProfile?.photo || '',
   })
@@ -72,12 +75,17 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!form.name.trim()) { showToast('El nombre no puede estar vacío', 'error'); return }
+    const contactEmail = form.contactEmail.trim().toLowerCase()
+    if (contactEmail && (contactEmail.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail))) {
+      showToast('Ingresa un correo de contacto válido o deja el campo vacío', 'error'); return
+    }
     setSaving(true)
     try {
       const updates = {
         name: form.name.trim(),
         position: form.position.trim(),
         phone: form.phone.trim(),
+        contactEmail,
         bio: form.bio.trim(),
         photo: form.photo.trim(),
       }
@@ -222,8 +230,18 @@ export default function ProfilePage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Teléfono</label>
-            <input className="form-input" value={form.phone}
+            <label className="form-label" htmlFor="profile-contact-email">Correo de contacto</label>
+            <input id="profile-contact-email" className="form-input" type="email" autoComplete="email" maxLength={320}
+              value={form.contactEmail} onChange={e => setField('contactEmail', e.target.value)}
+              aria-describedby="profile-login-email" />
+            <span id="profile-login-email" style={{ fontSize: 12, color: 'var(--text-2)', overflowWrap: 'anywhere' }}>
+              Correo de acceso: {userProfile?.email}. Cambiar el contacto conserva el acceso con esa cuenta.
+            </span>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="profile-contact-phone">Teléfono</label>
+            <input id="profile-contact-phone" className="form-input" autoComplete="tel" value={form.phone}
               onChange={e => setField('phone', e.target.value)}
               placeholder="+1 (xxx) xxx-xxxx" type="tel" />
           </div>
@@ -242,6 +260,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      {useLocalSql && <div className="card" style={{ marginTop: 24 }}><AccountSecurity email={user.email} /></div>}
     </div>
   )
 }

@@ -36,8 +36,8 @@ $environment=Join-Path $secretRoot 'environment.p7m'
 $launcher=Join-Path $platform 'Start-NodeApplication.ps1'
 $xml=@"
 <service>
-  <id>$serviceId</id><name>Agentes IA 3D SQL API</name>
-  <description>API local para Agentes IA 3D, SQL integrado y configuración CMS.</description>
+  <id>$serviceId</id><name>Stackbi Office SQL API</name>
+  <description>API local para Stackbi Office, SQL integrado y configuración CMS.</description>
   <executable>C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</executable>
   <arguments>-NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$launcher&quot; -EnvironmentFile &quot;$environment&quot; -EntryScript &quot;$entry&quot;</arguments>
   <workingdirectory>$release</workingdirectory><startmode>Automatic</startmode>
@@ -56,7 +56,7 @@ if($LASTEXITCODE -ne 0){throw 'No se pudo habilitar el SID del servicio'}
 foreach($dir in @($appRoot,$platform,$secretRoot)) { icacls $dir /grant ($identity+':(OI)(CI)(RX)') | Out-Null; if($LASTEXITCODE -ne 0){throw 'Fallo ACL de lectura'} }
 icacls $logRoot /grant ($identity+':(OI)(CI)(M)') | Out-Null
 if($LASTEXITCODE -ne 0){throw 'Fallo ACL de logs'}
-$cms=New-SelfSignedCertificate -Type DocumentEncryptionCert -Subject 'CN=StackBI Agentes IA 3D CMS' -CertStoreLocation Cert:\LocalMachine\My -KeyAlgorithm RSA -KeyLength 3072 -KeySpec KeyExchange -Provider 'Microsoft Enhanced RSA and AES Cryptographic Provider' -KeyExportPolicy NonExportable -NotAfter (Get-Date).AddYears(2)
+$cms=New-SelfSignedCertificate -Type DocumentEncryptionCert -Subject 'CN=StackBI Stackbi Office CMS' -CertStoreLocation Cert:\LocalMachine\My -KeyAlgorithm RSA -KeyLength 3072 -KeySpec KeyExchange -Provider 'Microsoft Enhanced RSA and AES Cryptographic Provider' -KeyExportPolicy NonExportable -NotAfter (Get-Date).AddYears(2)
 $privatePath=Join-Path 'C:\ProgramData\Microsoft\Crypto\RSA\MachineKeys' $cms.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName
 icacls $privatePath /grant ($identity+':(R)') | Out-Null
 if($LASTEXITCODE -ne 0){throw 'Fallo ACL de clave CMS'}

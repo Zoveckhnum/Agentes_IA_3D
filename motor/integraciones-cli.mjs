@@ -39,7 +39,7 @@ async function loginDrive() {
     if (!token.refresh_token) throw new Error('No se recibió acceso persistente. Revoca el acceso de esta app en Google y vuelve a autorizar.')
     const drive = driveClient(token.access_token)
     const roots = await drive('/files?' + new URLSearchParams({ q: "trashed = false and mimeType = 'application/vnd.google-apps.folder' and appProperties has { key='agentesRoot' and value='v1' }", fields: 'files(id)', pageSize: '100' }))
-    const folder = roots.files[0] || await drive('/files', 'POST', { name: 'Agentes IA 3D', mimeType: 'application/vnd.google-apps.folder', appProperties: { agentesRoot: 'v1' } })
+    const folder = roots.files[0] || await drive('/files', 'POST', { name: 'Stackbi Office', mimeType: 'application/vnd.google-apps.folder', appProperties: { agentesRoot: 'v1' } })
     writeFileSync(new URL('google-token.json', credentialsDir), JSON.stringify({ refresh_token: token.refresh_token, root: folder.id }), { mode: 0o600 })
     console.log('Drive conectado. Carpeta privada: https://drive.google.com/drive/folders/' + folder.id)
   } finally { clearTimeout(timer); server.close() }

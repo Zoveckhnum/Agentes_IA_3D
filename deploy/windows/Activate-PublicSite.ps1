@@ -52,7 +52,7 @@ $config=@"
         </conditions>
         <action type="Redirect" url="$escapedHost/{R:1}" appendQueryString="true" redirectType="Permanent" />
       </rule>
-      <rule name="Agentes IA 3D public proxy" stopProcessing="true">
+      <rule name="Stackbi Office public proxy" stopProcessing="true">
         <match url="(.*)" /><action type="Rewrite" url="http://127.0.0.1:10011/{R:1}" appendQueryString="true" />
       </rule>
     </rules></rewrite>
