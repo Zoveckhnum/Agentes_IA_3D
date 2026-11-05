@@ -27,7 +27,9 @@ check(csrf.status, 403)
 const invalidLogin = await request('/api/auth/login', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: `probe-${randomUUID()}@example.invalid`, password: randomUUID() }) })
 check(invalidLogin.status, 401)
 check(invalidLogin.headers.has('set-cookie'), false)
-for (const base of [origin.replace('https:', 'http:'), origin.replace('https://', 'https://www.')]) {
+// Explicit aliases avoid inventing a nested www hostname for subdomain deployments.
+const aliases = process.argv.length > 2 ? process.argv.slice(2) : [origin.replace('https:', 'http:'), origin.replace('https://', 'https://www.')]
+for (const base of aliases) {
   const response = await fetch(`${base}/?activation=verified`, { redirect: 'manual', signal: AbortSignal.timeout(20000) })
   check(response.status, 301)
   check(response.headers.get('location'), `${origin}/?activation=verified`)

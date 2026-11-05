@@ -1,5 +1,18 @@
 # Operación con SQL Server local
 
+La URL pública vigente desde el 5 de noviembre de 2026 es
+**https://stack-office.stackbi.com.mx**. `stackbi.com.mx` y `www.stackbi.com.mx`
+quedaron separados de la oficina y disponibles para otro sitio. El cambio de host conserva
+la base, cuentas y runtime publicado; requiere iniciar sesión en el nuevo dominio.
+`Move-OfficeHostname.ps1` respalda y actualiza IIS, rutas del túnel y el origen
+de la API, pasarela y controlador. Los respaldos cifrados quedan en
+`Applications/agentes-ia-3d/hostname-migrations` dentro de ProgramData/StackBI.
+`Update-SqlPreview.ps1` conserva por defecto el origen del manifiesto activo.
+`Reserve-PublicDomain.ps1` separó los hosts principales en el sitio IIS
+`StackBI-Public`, con archivos en `C:\inetpub\stackbi-public`. Actualmente muestra
+una página provisional sin indexación; no publica la API ni redirige a la oficina.
+El futuro sitio principal puede reemplazar esos archivos sin tocar la oficina.
+
 Preparación realizada el 3 de noviembre de 2026. La rama `feat/sql-local` está en
 `C:\Users\Rodrigo\Documents\GitHub\Agentes_IA_3D-sql-local`. Conserva los cambios
 previos del proyecto original; no se han creado commits. La copia SQL fue revisada
@@ -8,7 +21,7 @@ por el propietario y posteriormente se activó en https://stackbi.com.mx.
 ## Arquitectura instalada
 
 ```text
-Navegador HTTPS → Cloudflare Tunnel → IIS/ARR (:80, Host stackbi.com.mx)
+Navegador HTTPS → Cloudflare Tunnel → IIS/ARR (:80, Host stack-office.stackbi.com.mx)
                                             ↓ API Node (127.0.0.1:10011)
                                             ↓ ODBC Driver 18 + Windows + TLS
                                   sql.stackbi.com.mx:1433 → AgentesIA3D
@@ -103,7 +116,7 @@ no hay sincronización bidireccional entre ambas.
 
 API: servicio automático `node-agentes-ia-3d`, con recuperación tras fallos y
 logs rotativos (5 archivos de 10 MB). IIS: sitio público `StackBI`, con URL
-`https://stackbi.com.mx` y proxy en `C:\inetpub\stackbi-agentes-public`.
+`https://stack-office.stackbi.com.mx` y proxy en `C:\inetpub\stackbi-agentes-public`.
 El sitio `StackBI-Agentes-SQL-Preview` quedó detenido tras la activación pública;
 su URL HTTP anterior ya no es el punto de acceso a la aplicación.
 Comprobaciones: `/health` y `/health/db`; esta última verifica conexión TCP,
@@ -188,8 +201,9 @@ Para CMS se requiere volver a cifrar los paquetes con el certificado nuevo y
 probarlos antes de retirar la clave anterior. No quitar certificados de confianza
 ni claves mientras los servicios o paquetes dependan de ellos.
 
-La aplicación está publicada en **https://stackbi.com.mx**. HTTP y www redirigen
-al origen HTTPS principal, conservando ruta y consulta. PUBLIC_ORIGIN coincide
+La aplicación está publicada en **https://stack-office.stackbi.com.mx**. HTTP en
+ese host redirige a HTTPS, conservando ruta y consulta. El dominio principal tiene
+su propio sitio y no redirige a la oficina. PUBLIC_ORIGIN coincide
 con ese origen y ALLOW_LOCAL_HTTP=false. La cookie de autenticación usa el prefijo
 __Host-, Secure, HttpOnly, SameSite=Strict y Path=/; se requiere iniciar sesión
 de nuevo desde el dominio, con la contraseña modificada en la revisión local.

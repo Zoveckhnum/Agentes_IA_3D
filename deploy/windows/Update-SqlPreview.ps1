@@ -1,11 +1,12 @@
 [CmdletBinding()]
-param([string]$RepositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,[string]$PublicOrigin='http://127.0.0.1:11090')
+param([string]$RepositoryRoot=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,[string]$PublicOrigin)
 $ErrorActionPreference='Stop'
 & 'C:\Program Files\nodejs\node.exe' (Join-Path $RepositoryRoot 'tools\roles.mjs') check | Out-Null
 if($LASTEXITCODE -ne 0){throw 'Las fichas o los paquetes de habilidades no superan la verificacion'}
 $appRoot='C:\ProgramData\StackBI\Applications\agentes-ia-3d'
 $deploymentPath=Join-Path $appRoot 'deployment.json'
 $deployment=Get-Content -LiteralPath $deploymentPath -Raw | ConvertFrom-Json
+if(-not $PublicOrigin){$PublicOrigin=[string]$deployment.origin}
 $releases=[IO.Path]::GetFullPath((Join-Path $appRoot 'releases'))
 $oldRelease=[IO.Path]::GetFullPath($deployment.release)
 if($deployment.service -ne 'node-agentes-ia-3d' -or -not $oldRelease.StartsWith($releases+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'Manifiesto de despliegue inesperado'}
