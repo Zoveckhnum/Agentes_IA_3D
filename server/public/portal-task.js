@@ -8,7 +8,7 @@ async function refresh(){
  try{
   if(!/^portal-[a-z0-9-]+-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(taskId)||taskId.length>200)throw new Error('invalid')
   const task=await read('tasks/'+taskId);if(!task)throw new Error('missing');const agent=task.asignado?await read('agents/'+task.asignado):null,trace=portalJobTrace(task,agent,taskId,location.origin)
-  const blocked=trace.qualityStatus==='blocked'||trace.qualityStatus==='failed'||trace.reviews.some(r=>['blocked','failed'].includes(r.verdict)),passed=trace.qualityStatus==='passed'&&trace.reviews.length&&trace.reviews.every(r=>r.verdict==='passed'&&r.evidence.some(Boolean))
+  const blocked=trace.qualityStatus==='blocked'||trace.qualityStatus==='failed'||trace.reviews.some(r=>['blocked','failed'].includes(r.verdict)),passed=trace.qualityStatus==='passed'&&trace.reviews.length&&trace.reviews.every(r=>r.verdict==='passed'&&r.evidence.some(e=>e.trim())&&!r.issues.length)
   find('title').textContent=task.tarea||'Tarea de integración'
   find('status').textContent=task.agentStatus==='running'?'Agente trabajando':task.agentStatus==='reviewing'?'Revisión de calidad en curso':blocked?'Generado · QA bloqueada':passed?'QA aprobada · consultar revisión humana':task.agentStatus==='needs_info'?'El agente necesita información':'Resultado sujeto a revisión'
   find('status').className='status'+(blocked?' warning':'')

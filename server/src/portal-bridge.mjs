@@ -1,4 +1,4 @@
-import {portalJobTrace} from '../public/portal-job-trace.mjs'
+import {portalJobTrace} from './portal-job-trace.mjs'
 import express from 'express'
 import {readFileSync} from 'node:fs'
 import {join} from 'node:path'
@@ -25,5 +25,16 @@ export function createPortalBridge({repository,officeOrigin,configuration=()=>br
   res.status(201).json({id:path.split('/')[1],duplicate:false,agent:agent.name})
  })
  router.get('/jobs/:id',async(req,res)=>{const c=req.portalBridge;if(!req.params.id.startsWith('portal-'+c.id+'-')||!uuid.test(req.params.id.slice(('portal-'+c.id+'-').length))||!/^\d+$/.test(String(req.query.userId)))throw new ApiError(400,'invalid-argument');await open(c);const row=await repository.read(actor(c),{kind:'document',path:'tasks/'+req.params.id}),t=row.data;if(!t||t.portalBridge?.integration!==c.id||t.portalBridge?.portalUserId!==Number(req.query.userId))throw new ApiError(404,'not-found');const assigned=(await repository.read(actor(c),{kind:'document',path:'agents/'+t.asignado})).data;res.json({id:req.params.id,trace:portalJobTrace(t,assigned,req.params.id,officeOrigin),state:t.estado,agentStatus:t.agentStatus||'queued',qualityStatus:t.qualityStatus||null,result:typeof t.agentOutput==='string'&&t.agentOutput?t.agentOutput.slice(0,30000):String(t.agentQuestion||(['error','approval_blocked','needs_approval'].includes(t.agentStatus)?'La solicitud necesita revisión en la oficina. Consulta el estado y las autorizaciones pendientes.':'')).slice(0,30000),needsHumanReview:true})})
+ router.post('/jobs/:id/review',async(req,res)=>{
+  const c=req.portalBridge,b=req.body,prefix='portal-'+c.id+'-'
+  if(!req.params.id.startsWith(prefix)||!uuid.test(req.params.id.slice(prefix.length))||!b||!uuid.test(b.requestId)||!Number.isSafeInteger(b.userId)||typeof b.revision!=='string'||!/^[a-f0-9]{64}$/.test(b.outputSHA256)||Object.keys(b).some(k=>!['requestId','userId','revision','outputSHA256'].includes(k)))throw new ApiError(400,'invalid-argument')
+  await open(c)
+  const a=actor(c),path='tasks/'+req.params.id,t=(await repository.read(a,{kind:'document',path})).data
+  if(!t||t.portalBridge?.integration!==c.id||t.portalBridge.portalUserId!==b.userId)throw new ApiError(404,'not-found')
+  if(t.portalQaOnly?.requestId===b.requestId||t.portalQaLastRequest===b.requestId)return res.json({id:req.params.id,duplicate:true})
+  if(c.id!=='iqualitys'||t.projectId||t.agentStatus!=='done'||t.estado!=='en_espera'||t.autoLoopOwner||t.portalQaOnly||t.qualityRevision!==b.revision||!t.agentOutput||digest(t.agentOutput)!==b.outputSHA256)throw new ApiError(409,'aborted','La entrega cambió o ya está en revisión.')
+  await repository.commit(a,{id:b.requestId,preconditions:[{path,expected:{estado:t.estado,agentStatus:t.agentStatus,autoLoopOwner:null,portalQaOnly:null,qualityRevision:t.qualityRevision,agentOutput:t.agentOutput,portalBridge:t.portalBridge}}],operations:[{type:'update',path,data:{estado:'en_revision',agentStatus:'queued',portalQaOnly:{requestId:b.requestId,outputSHA256:b.outputSHA256,requestedAt:new Date().toISOString()}}}]})
+  res.status(202).json({id:req.params.id,qaOnly:true})
+ })
  return router
 }

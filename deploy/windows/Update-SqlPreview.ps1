@@ -16,8 +16,10 @@ New-Item -ItemType Directory -Path (Join-Path $newRelease 'server') -Force | Out
 foreach($name in @('src','node_modules')){Copy-Item -LiteralPath (Join-Path $RepositoryRoot ('server\'+$name)) -Destination (Join-Path $newRelease ('server\'+$name)) -Recurse}
 foreach($name in @('package.json','package-lock.json')){Copy-Item -LiteralPath (Join-Path $RepositoryRoot ('server\'+$name)) -Destination (Join-Path $newRelease 'server')}
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'deploy\sql-preview') -Destination (Join-Path $newRelease 'public') -Recurse
+Copy-Item -Path (Join-Path $RepositoryRoot 'server\public\*') -Destination (Join-Path $newRelease 'public') -Force
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'server\src\portal-job-trace.mjs') -Destination (Join-Path $newRelease 'public\portal-job-trace.mjs')
 $sourceFiles=@()
-foreach($relative in @('server\src','server\migrations','shared','app\src','roles\catalogo.json','roles\skills.index.json')){
+foreach($relative in @('server\src','server\public','server\migrations','shared','app\src','roles\catalogo.json','roles\skills.index.json')){
   foreach($file in Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot $relative) -Recurse -File){$sourceFiles+=($file.FullName.Substring($RepositoryRoot.Length)+':'+(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash)}
 }
 $sourceText=($sourceFiles|Sort-Object)-join "`n"

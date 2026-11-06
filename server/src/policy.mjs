@@ -40,7 +40,7 @@ export async function authorizeWrite(actor, operation, before, after, lookup) {
       break
     }
     case 'tasks': {
-      const protectedFields = ['officePause','humanApprovalRequests','humanApprovalHistory','autoLoopOwner', 'autoLoopExpiresAt', 'autoLoopAttempts', 'qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead']
+      const protectedFields = ['portalQaOnly', 'portalQaLastRequest', 'qualityHistory', 'qualityCorrectionCount', 'officePause','humanApprovalRequests','humanApprovalHistory','autoLoopOwner', 'autoLoopExpiresAt', 'autoLoopAttempts', 'qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead']
       const inputsChanged = [...keys].some(k => ['tarea', 'descripcion', 'feedback', 'links', 'asignado', 'projectId'].includes(k))
       if (deleting) { allowed = admin; break }
       if (create) {

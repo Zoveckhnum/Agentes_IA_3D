@@ -9,6 +9,7 @@ import { createRepository } from './repository.mjs'
 import { createAuth } from './auth.mjs'
 import { ApiError } from './values.mjs'
 import {createPortalBridge} from './portal-bridge.mjs'
+import {mountPortalTaskAssets} from './portal-task-assets.mjs'
 import { createAccountSecurity } from './account-security.mjs'
 
 export function createApplication(database, config, dependencies = {}) {
@@ -50,6 +51,7 @@ export function createApplication(database, config, dependencies = {}) {
   app.get('/api/worker/capabilities', (req, res, next) => req.actor.worker ? res.json({ atomicClaims: true, version: 1 }) : next(new ApiError(403, 'permission-denied')))
   app.post('/api/data/commit', async (req, res) => res.json(await repository.commit(req.actor, req.body)))
   app.use('/api', (_req, _res, next) => next(new ApiError(404, 'not-found')))
+  mountPortalTaskAssets(app)
   if (config.staticRoot) {
     const root = resolve(config.staticRoot)
     if (!existsSync(join(root, 'index.html'))) throw new Error('No existe la compilación del frontend')
