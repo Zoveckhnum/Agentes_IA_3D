@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { requestSecurityCode, changePassword, changeLoginEmail } from '../data/sql-auth.js'
 import SessionClosingNotice, { SESSION_CLOSING_MS } from './SessionClosingNotice.jsx'
+import {useCentralAccess} from './CentralPlatformLink.jsx'
 
 export default function AccountSecurity({ email, forced = false }) {
+  const central=useCentralAccess()
   const [purpose, setPurpose] = useState(forced ? 'password' : '')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -59,6 +61,7 @@ export default function AccountSecurity({ email, forced = false }) {
   }
   const fields = { border: 0, padding: 0, margin: 0, minWidth: 0, display: 'grid', gap: 14 }
   const codeAttributes = { inputMode: 'numeric', pattern: '[0-9]{8}', minLength: 8, maxLength: 8 }
+  if(central?.required)return <section aria-labelledby={`${prefix}-title`}><h2 id={`${prefix}-title`}>Acceso y seguridad</h2><p>Tu cuenta de acceso se administra desde Portal iqualitys. Los datos de contacto de tu perfil se conservan en la oficina.</p><a className="btn btn-secondary" href={central.portalUrl}>Abrir Portal iqualitys</a></section>
   return <section aria-labelledby={`${prefix}-title`}>
     {closing && <SessionClosingNotice purpose={purpose} email={purpose === 'email' ? challenge.destination : email} onContinue={continueToLogin} />}
     <h2 id={`${prefix}-title`} style={{ fontSize: 18, marginBottom: 8 }}>{forced ? 'Verifica tu correo y cambia la contraseña' : 'Acceso y seguridad'}</h2>

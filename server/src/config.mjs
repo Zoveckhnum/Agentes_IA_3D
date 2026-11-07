@@ -1,3 +1,4 @@
+import {centralConfiguration} from './central-connector.mjs'
 const required = (env, name) => {
   const value = env[name]
   if (typeof value !== 'string' || !value.trim()) throw new Error(`Falta ${name}`)
@@ -34,6 +35,7 @@ export function applicationConfig(env = process.env) {
   if (workerToken.length < 48) throw new Error('WORKER_API_TOKEN requiere al menos 48 caracteres aleatorios')
   return {
     origin: origin.origin, secureCookies: !localHttp, host: '127.0.0.1',
+    central: centralConfiguration(env,'office',origin.origin),
     port: integer(env.PORT ?? 10011, 'PORT', 1024, 65535), workerToken,
     workerUid: required(env, 'WORKER_UID'), workerEmail: required(env, 'WORKER_EMAIL').toLowerCase(),
     ownerUid: required(env, 'APP_OWNER_UID'),

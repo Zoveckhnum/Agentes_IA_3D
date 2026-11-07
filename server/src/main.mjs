@@ -11,9 +11,12 @@ import { ApiError } from './values.mjs'
 import {createPortalBridge} from './portal-bridge.mjs'
 import {mountPortalTaskAssets} from './portal-task-assets.mjs'
 import { createAccountSecurity } from './account-security.mjs'
+import { createCentralConnector,CentralError } from './central-connector.mjs'
 
 export function createApplication(database, config, dependencies = {}) {
-  const app = express(), repository = createRepository(database, config.maxDocuments, config.ownerUid), auth = createAuth(database, config)
+  const app = express(), repository = createRepository(database, config.maxDocuments, config.ownerUid)
+  const central=createCentralConnector(config.central||{enabled:false,portalId:'office'},{issueSession:(_req,res,id)=>auth.centralSession(id,res)})
+  const auth = createAuth(database, config, central)
   const security = createAccountSecurity(database, config, dependencies.sendSecurityMail)
   app.disable('x-powered-by')
   app.set('trust proxy', 'loopback')
@@ -35,6 +38,7 @@ export function createApplication(database, config, dependencies = {}) {
   })
   app.use('/api', express.json({ limit: config.maxBodyBytes, strict: true }))
   app.use('/api/integrations/portal',createPortalBridge({repository,configuration:config.portalBridgeConfiguration,officeOrigin:config.origin}))
+  app.use('/api',central.router)
   app.post('/api/auth/login', async (req, res) => res.json({ user: await auth.login(req, res) }))
   app.post('/api/auth/register', async (req, res) => res.json(await auth.register(req)))
   app.use('/api', async (req, _res, next) => { try { req.actor = await auth.actor(req); next() } catch (error) { next(error) } })
@@ -43,6 +47,7 @@ export function createApplication(database, config, dependencies = {}) {
     res.json({ user })
   })
   app.post('/api/auth/logout', async (req, res) => { await auth.logout(req.actor, res); res.json({ ok: true }) })
+  app.use(['/api/auth/security/request','/api/auth/password','/api/auth/email'],(_req,_res,next)=>central.enabled?next(new ApiError(403,'auth/central-required','Administra tu acceso desde Portal iqualitys.')):next())
   app.post('/api/auth/security/request', async (req, res) => res.json(await security.request(req.actor, req.body)))
   app.post('/api/auth/password', async (req, res) => { await security.confirm(req.actor, req.body, 'password'); auth.clearSessionCookie(res); res.json({ ok: true }) })
   app.post('/api/auth/email', async (req, res) => { await security.confirm(req.actor, req.body, 'email'); auth.clearSessionCookie(res); res.json({ ok: true }) })
@@ -59,9 +64,9 @@ export function createApplication(database, config, dependencies = {}) {
     app.get('/{*path}', (_req, res) => res.sendFile(join(root, 'index.html')))
   }
   app.use((error, req, res, _next) => {
-    const status = error instanceof ApiError ? error.status : error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : 500
+    const status = error instanceof ApiError || error instanceof CentralError ? error.status : error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : 500
     if (status === 500) console.error(JSON.stringify({ event: 'request_failed', requestId: req.requestId, code: error.code || 'internal', time: new Date().toISOString() }))
-    res.status(status).json({ error: { code: error instanceof ApiError ? error.code : 'internal', message: error instanceof ApiError ? error.message : 'No se pudo completar la operación.', requestId: req.requestId } })
+    res.status(status).json({ error: { code: error instanceof ApiError ? error.code : error instanceof CentralError?'auth/central-access':'internal', message: error instanceof ApiError || error instanceof CentralError ? error.message : 'No se pudo completar la operación.', requestId: req.requestId } })
   })
   return app
 }
