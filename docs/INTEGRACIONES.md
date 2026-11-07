@@ -69,7 +69,7 @@ El bot usa long polling; no necesita dominio, IP pública ni puertos entrantes. 
    npm run drive:login
    ```
 
-7. Abre la URL que muestra la terminal en el navegador **del mismo PC**, elige tu cuenta personal y autoriza. El proceso escucha un callback temporal en loopback, con PKCE y comprobación de estado. Debe terminar mostrando “Drive conectado” y un enlace a la carpeta privada **Agentes IA 3D**.
+7. Abre la URL que muestra la terminal en el navegador **del mismo PC**, elige tu cuenta personal y autoriza. El proceso escucha un callback temporal en loopback, con PKCE y comprobación de estado. Debe terminar mostrando “Drive conectado” y un enlace a la carpeta privada **Stackbi Office**.
 8. Ejecuta `npm run integraciones:check`. La autorización persistente se guarda en `motor/credenciales/google-token.json`, excluido de Git.
 9. Registra un proyecto con el comando de GitHub anterior, o uno que use solo Drive:
 

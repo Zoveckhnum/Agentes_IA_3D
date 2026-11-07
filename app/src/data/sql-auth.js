@@ -24,9 +24,17 @@ export async function signInWithEmailAndPassword(_auth, email, password) {
 export async function signOut() {
   try { await request('/auth/logout', { method: 'POST', body: {} }) } finally { notify(null) }
 }
-export async function changePassword(password) {
-  await request('/auth/password', { method: 'POST', body: { password } })
-  notify(null)
+export const requestSecurityCode = body => request('/auth/security/request', { method: 'POST', body })
+async function finishCredentialChange(onConfirmed) {
+  try { await onConfirmed?.() } finally { notify(null) }
+}
+export async function changePassword(password, verification = {}, onConfirmed) {
+  await request('/auth/password', { method: 'POST', body: { ...verification, password } })
+  await finishCredentialChange(onConfirmed)
+}
+export async function changeLoginEmail(verification, onConfirmed) {
+  await request('/auth/email', { method: 'POST', body: verification })
+  await finishCredentialChange(onConfirmed)
 }
 export const browserLocalPersistence = 'local'
 export const browserSessionPersistence = 'session'

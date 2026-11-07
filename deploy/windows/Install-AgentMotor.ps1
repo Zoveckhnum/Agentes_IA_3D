@@ -13,6 +13,8 @@ foreach($folder in @($root,$release,(Join-Path $release 'motor'),(Join-Path $roo
 icacls $root /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)(F)' '*S-1-5-32-544:(OI)(CI)(F)'|Out-Null;if($LASTEXITCODE){throw 'Fallo de ACL'}
 foreach($file in Get-ChildItem -LiteralPath (Join-Path $RepositoryRoot 'motor') -File|Where-Object {$_.Name -eq 'AGENTS.md' -or ($_.Extension -eq '.mjs' -and $_.Name -notlike '*.test.mjs')}){Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $release 'motor')}
 Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'motor\hitl') -Destination (Join-Path $release 'motor') -Recurse
+New-Item -ItemType Directory -Path (Join-Path $release 'office') -Force|Out-Null
+Copy-Item -LiteralPath (Join-Path $RepositoryRoot 'office\core.mjs') -Destination (Join-Path $release 'office\core.mjs')
 foreach($dir in @('shared','roles')){Copy-Item -LiteralPath (Join-Path $RepositoryRoot $dir) -Destination (Join-Path $release $dir) -Recurse}
 foreach($file in @('package.json','package-lock.json')){Copy-Item -LiteralPath (Join-Path $RepositoryRoot ('deploy\motor-runtime\'+$file)) -Destination $root}
 & npm.cmd ci --prefix $root --ignore-scripts --omit=dev|Out-Null;if($LASTEXITCODE){throw 'Falló la instalación del runtime fijado por lockfile'}

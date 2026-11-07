@@ -50,6 +50,22 @@ const admin = { uid: 'admin', email: 'admin@test.invalid', role: 'admin', isSupe
 const worker = { uid: 'worker', email: 'worker@test.invalid', worker: true }
 const lookup = async path => path === 'agents/agent' ? {} : null
 
+test('el contacto se puede editar sin cambiar la identidad de acceso ni los permisos', async () => {
+  const before = { email: employee.email, role: 'empleado', name: 'Persona' }
+  const contact = { contactEmail: 'contacto@test.invalid', phone: '+52 55 1234 5678' }
+  for (const actor of [employee, admin, { ...admin, isSuper: false }]) {
+    await authorizeWrite(actor, { path: 'users/employee' }, before, { ...before, ...contact }, lookup)
+    await assert.rejects(authorizeWrite(actor, { path: 'users/employee' }, before, { ...before, email: contact.contactEmail }, lookup))
+    for (const contactEmail of ['sin-arroba', 'a @test.invalid', null, 42, 'a'.repeat(321)]) {
+      await assert.rejects(authorizeWrite(actor, { path: 'users/employee' }, before, { ...before, contactEmail }, lookup))
+    }
+    await authorizeWrite(actor, { path: 'users/employee' }, before, { ...before, contactEmail: '' }, lookup)
+  }
+  await assert.rejects(authorizeWrite(employee, { path: 'users/other' }, before, { ...before, ...contact }, lookup))
+  await assert.rejects(authorizeWrite(employee, { path: 'users/employee' }, before, { ...before, ...contact, role: 'admin' }, lookup))
+  await assert.rejects(authorizeWrite(worker, { path: 'users/employee' }, before, { ...before, ...contact }, lookup))
+})
+
 test('la UI no puede fabricar recibos humanos ni completar una operación pendiente', async () => {
   const before={asignado:'agent',createdBy:admin.email,estado:'en_espera',agentStatus:'needs_approval',humanApprovalRequests:['request-id']}
   await assert.rejects(authorizeWrite(admin,{path:'tasks/test'},before,{...before,humanApprovalRequests:[]},lookup))

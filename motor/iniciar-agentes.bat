@@ -1,5 +1,5 @@
 @echo off
-title Motor de agentes - Agentes IA 3D
+title Motor de agentes - Stackbi Office
 cd /d "%~dp0"
 if not exist node_modules (
   echo Instalando dependencias por primera vez...

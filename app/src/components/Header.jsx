@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import { useApp, APP_VERSION, SUPER_ADMIN_EMAIL } from '../App.jsx'
 import Icon from './Icons.jsx'
 import { BRAND } from '../config.js'
+import CentralPlatformLink from './CentralPlatformLink.jsx'
+import './central-access.css'
 
 const EMPLOYEE_NAV = [
   { id: 'dashboard', icon: 'grid',        label: 'Mi Panel' },
@@ -85,8 +87,8 @@ export default function Header({ page, setPage, onLogout }) {
 
       {/* Acciones */}
       <div className="header-actions">
-        <button className="btn btn-primary btn-sm" onClick={openNewTask}>
-          <Icon name="plus" size={14} /> Nueva tarea
+        <button className="btn btn-primary btn-sm header-new-task" onClick={openNewTask} aria-label="Nueva tarea">
+          <Icon name="plus" size={14} /><span>Nueva tarea</span>
         </button>
 
         {/* Campana de notificaciones */}
@@ -169,7 +171,7 @@ export default function Header({ page, setPage, onLogout }) {
 
         {/* Menú usuario */}
         <div className="dropdown-wrap">
-          <div className="user-chip" onClick={() => setMenuOpen(v => !v)}>
+          <button type="button" className="user-chip" onClick={() => setMenuOpen(v => !v)} aria-label="Menú de cuenta" aria-expanded={menuOpen} aria-controls="office-account-menu">
             {userProfile?.photo
               ? <img src={userProfile.photo} alt="" />
               : <div style={{
@@ -185,12 +187,12 @@ export default function Header({ page, setPage, onLogout }) {
               {userProfile?.name?.split(' ')[0] || 'Yo'}
             </span>
             <Icon name="chevronDown" size={12} style={{ color: 'var(--text-3)' }} />
-          </div>
+          </button>
 
           {menuOpen && (
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 150 }} onClick={() => setMenuOpen(false)} />
-              <div className="dropdown-menu" style={{ zIndex: 200 }}>
+              <div id="office-account-menu" className="dropdown-menu" style={{ zIndex: 200 }}>
                 <div style={{ padding: '8px 12px 10px', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{userProfile?.name}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 2 }}>{userProfile?.email}</div>
@@ -201,6 +203,7 @@ export default function Header({ page, setPage, onLogout }) {
                     </span>
                   </div>
                 </div>
+                <CentralPlatformLink/>
                 <button className="dropdown-item" onClick={() => { setPage('profile'); setMenuOpen(false) }}>
                   <Icon name="user" size={14} /> Mi perfil
                 </button>

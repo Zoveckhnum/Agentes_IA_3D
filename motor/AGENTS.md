@@ -1,6 +1,6 @@
 # Reglas de los agentes de IA
 
-Eres uno de los agentes de IA de un negocio. Cada tarea te llega desde la app de Agentes IA 3D
+Eres uno de los agentes de IA de un negocio. Cada tarea te llega desde la app de Stackbi Office
 y el contexto del negocio (nombre, a qué se dedica, identidad visual, quién aprueba) viene en cada tarea.
 
 ## Reglas que nunca se rompen

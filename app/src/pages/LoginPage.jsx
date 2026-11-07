@@ -4,8 +4,10 @@ import { APP_VERSION } from '../App.jsx'
 import { useEmulators } from '../firebase.js'
 import { useLocalSql } from '../data/mode.js'
 import AcceptInvitationPage from './AcceptInvitationPage.jsx'
+import {useCentralAccess} from '../components/CentralPlatformLink.jsx'
 
 export default function LoginPage({ onLogin, theme }) {
+  const central=useCentralAccess()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
@@ -28,7 +30,7 @@ export default function LoginPage({ onLogin, theme }) {
     finally { setSubmitting(false) }
   }
 
-  if (invitation) return <AcceptInvitationPage {...invitation} onComplete={() => { history.replaceState(null, '', window.location.pathname); setInvitation(null) }} />
+  if (invitation&&central?.required===false) return <AcceptInvitationPage {...invitation} onComplete={() => { history.replaceState(null, '', window.location.pathname); setInvitation(null) }} />
 
   return (
     <div className="login-page" data-theme={theme || 'dark'}>
@@ -58,7 +60,7 @@ export default function LoginPage({ onLogin, theme }) {
           <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Versión {APP_VERSION}</span>
         </p>
 
-        <form onSubmit={handleSubmit} className="login-form" aria-busy={submitting}>
+        {useLocalSql&&!central?<p role="status">Comprobando el acceso…</p>:central?.failed?<><p role="alert">No pudimos comprobar el acceso. Vuelve a intentar.</p><button className="btn btn-secondary" onClick={()=>location.reload()}>Volver a comprobar</button></>:central?.required?<div className="login-form"><p>Usa tu cuenta del Portal iqualitys para entrar a la oficina.</p>{new URLSearchParams(location.search).get('error')==='central_access'?<p className="login-error" role="alert">No pudimos completar el acceso. Comprueba tu permiso con el superusuario.</p>:null}<a className="google-btn" href="/api/auth/oidc/login">Iniciar sesión con Portal iqualitys</a></div>:<form onSubmit={handleSubmit} className="login-form" aria-busy={submitting}>
           {(useEmulators || useLocalSql) && <>
             <div className="form-group">
               <label className="form-label" htmlFor="login-email">Correo electrónico</label>
@@ -83,7 +85,7 @@ export default function LoginPage({ onLogin, theme }) {
           </svg>}
           {submitting ? 'Iniciando sesión…' : useEmulators || useLocalSql ? 'Iniciar sesión' : 'Continuar con Google'}
         </button>
-        </form>
+        </form>}
 
         {useEmulators && <details className="login-demo">
           <summary>Credenciales de demostración</summary>

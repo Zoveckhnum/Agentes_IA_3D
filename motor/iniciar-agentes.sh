@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Motor de agentes - Agentes IA 3D (macOS / Linux). Ctrl + C para apagarlo.
+# Motor de agentes - Stackbi Office (macOS / Linux). Ctrl + C para apagarlo.
 cd "$(dirname "$0")"
 if [ ! -d node_modules ]; then
   echo "Instalando dependencias por primera vez..."

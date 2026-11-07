@@ -1,4 +1,4 @@
-# Agentes IA 3D
+# Stackbi Office
 
 > Si eres un agente de IA ejecutando una tarea del motor (tu carpeta de trabajo está dentro de `motor/trabajos/`),
 > ignora este archivo: tus reglas están en `motor/AGENTS.md` y en el texto de tu tarea.

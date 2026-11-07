@@ -62,10 +62,15 @@ service cloud.firestore {
       allow update: if isAuth() && (
         isAdmin() ||
         (request.auth.uid == userId && request.resource.data.email == request.auth.token.email && (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photo', 'phone', 'bio', 'position', 'color', 'lastSeen'])
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'photo', 'phone', 'contactEmail', 'bio', 'position', 'color', 'lastSeen'])
           || (isOwner() && request.resource.data.role == 'admin')
         ))
-      );
+      ) && request.resource.data.email == resource.data.email
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['contactEmail'])
+          || (request.resource.data.contactEmail is string
+            && request.resource.data.contactEmail.size() <= 320
+            && (request.resource.data.contactEmail == ''
+              || request.resource.data.contactEmail.matches('^[^\\s@]+@[^\\s@]+[.][^\\s@]+$'))));
       allow delete: if isAdmin();
     }
 

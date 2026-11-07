@@ -31,13 +31,16 @@ export async function authorizeWrite(actor, operation, before, after, lookup) {
       if (deleting) allowed = admin && actor.uid !== id && before?.isSuper !== true
       else if (create) allowed = actor.uid === id && after.email === actor.email && after.role === 'pending' && !after.isSuper
       else if (admin) allowed = (actor.isSuper || (!keys.has('isSuper') && (!keys.has('role') || (before.role !== 'admin' && after.role !== 'admin')))) && (!before?.isSuper || actor.uid === id) && !keys.has('email')
-      else allowed = actor.uid === id && after.email === actor.email && only(keys, ['name', 'photo', 'phone', 'bio', 'position', 'color', 'lastSeen', 'look'])
+      else allowed = actor.uid === id && after.email === actor.email && only(keys, ['name', 'photo', 'phone', 'contactEmail', 'bio', 'position', 'color', 'lastSeen', 'look'])
+      if (keys.has('contactEmail') && (typeof after?.contactEmail !== 'string' || after.contactEmail.length > 320 || (after.contactEmail !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(after.contactEmail)))) allowed = false
       if (after && !['admin', 'empleado', 'pending'].includes(after.role)) allowed = false
+      if(keys.has('executiveRole')&&(!admin||!actor.isSuper||actor.worker||create||deleting))allowed=false
+      if(after?.executiveRole!==undefined&&!['ceo',null].includes(after.executiveRole))allowed=false
       if (before?.isSuper && (deleting || after?.isSuper !== true || after?.role !== 'admin')) allowed = false
       break
     }
     case 'tasks': {
-      const protectedFields = ['humanApprovalRequests','humanApprovalHistory','autoLoopOwner', 'autoLoopExpiresAt', 'autoLoopAttempts', 'qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead']
+      const protectedFields = ['portalQaOnly', 'portalQaLastRequest', 'qualityHistory', 'qualityCorrectionCount', 'officePause','humanApprovalRequests','humanApprovalHistory','autoLoopOwner', 'autoLoopExpiresAt', 'autoLoopAttempts', 'qualityReviews', 'qualityRevision', 'qualityManifest', 'qualityCheckedAt', 'qualityReport', 'agentOutput', 'projectSnapshot', 'projectBranch', 'projectHead']
       const inputsChanged = [...keys].some(k => ['tarea', 'descripcion', 'feedback', 'links', 'asignado', 'projectId'].includes(k))
       if (deleting) { allowed = admin; break }
       if (create) {
@@ -47,6 +50,7 @@ export async function authorizeWrite(actor, operation, before, after, lookup) {
       allowed = admin || (employee && (before.asignado === actor.uid || before.createdBy === actor.email || (before.estado === 'pendiente' && after.asignado === actor.uid))) || (actor.worker && before.asignado === after.asignado && !!await lookup(`agents/${before.asignado}`))
       if (!actor.worker && ([...keys].some(k => protectedFields.includes(k)) || (keys.has('qualityStatus') && after.qualityStatus !== 'pending') || (Object.hasOwn(before, 'qualityStatus') && inputsChanged && after.qualityStatus !== 'pending'))) allowed = false
       if (keys.has('createdAt')) allowed = false
+      if (keys.has('officePause') || before.officePause) allowed = false
       if (after.estado === 'completada' && ((after.projectId && !quality(after)) || (Object.hasOwn(before, 'qualityStatus') && (!quality(before) || !quality(after) || inputsChanged)))) allowed = false
       if (after.estado === 'completada' && (after.humanApprovalRequests?.length || ['needs_approval','approval_blocked'].includes(after.agentStatus))) allowed = false
       break

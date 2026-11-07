@@ -2,7 +2,7 @@
 const env = import.meta.env
 
 export const BRAND = {
-  appName: env.VITE_APP_NAME || 'Agentes IA 3D',
+  appName: env.VITE_APP_NAME?.replaceAll('Agentes IA 3D', 'Stackbi Office') || 'Stackbi Office',
   company: env.VITE_COMPANY_NAME || 'Mi empresa',
   color: env.VITE_BRAND_COLOR || '#4700E0',
   logo: env.VITE_LOGO_URL || '/logo.svg',

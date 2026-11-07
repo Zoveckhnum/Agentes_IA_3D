@@ -12,7 +12,7 @@ const writeNew = (file, content) => {
   console.log(`Creado: ${file}`)
 }
 mkdirSync(join(root, '.local'), { recursive: true })
-writeNew('app/.env', `VITE_APP_NAME=Agentes IA 3D
+writeNew('app/.env', `VITE_APP_NAME=Stackbi Office
 VITE_COMPANY_NAME=Mi oficina local
 VITE_SUPER_ADMIN_EMAIL=admin@oficina.local
 VITE_APP_URL=http://127.0.0.1:5173

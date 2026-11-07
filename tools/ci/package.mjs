@@ -12,6 +12,7 @@ if(process.env.GITHUB_SHA && process.env.GITHUB_SHA!==commit)throw new Error('Ch
 const evidence=JSON.parse(await readFile(new URL('../../.local/ci-evidence.json',import.meta.url)))
 if(evidence.commit!==commit)throw new Error('Test evidence belongs to another revision')
 const files=[...await collect(root+'server/src','server/src'),...await collect(root+'server/migrations','server/migrations'),...await collect(root+'server/node_modules','server/node_modules'),...await collect(root+'deploy/sql-preview','public')]
+files.push(...await collect(root+'server/public','public'),{name:'public/portal-job-trace.mjs',content:await readFile(root+'server/src/portal-job-trace.mjs')})
 for(const name of ['package.json','package-lock.json'])files.push({name:'server/'+name,content:await readFile(root+'server/'+name)})
 const manifest={format:'stackbi-ci-artifact-v1',project:'agentes-ia-3d',repository:process.env.GITHUB_REPOSITORY||'Zoveckhnum/Agentes_IA_3D',commit,ref:process.env.GITHUB_REF||git(['symbolic-ref','HEAD']),runId:process.env.GITHUB_RUN_ID||'local',runAttempt:process.env.GITHUB_RUN_ATTEMPT||'1',platform:'win32',arch:'x64',node:process.versions.node,cleanSource:true,checks:evidence.checks,files:Object.fromEntries(files.sort((a,b)=>a.name.localeCompare(b.name)).map(f=>[f.name,sha256(f.content)]))}
 const bytes=createZip([...files,{name:'manifest.json',content:Buffer.from(JSON.stringify(manifest))}])

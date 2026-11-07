@@ -1,4 +1,4 @@
-# Agentes IA 3D con OpenAI Codex
+# Stackbi Office con OpenAI Codex
 
 ![Oficina con agentes de IA](docs/oficina-3d.jpg)
 

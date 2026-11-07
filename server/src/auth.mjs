@@ -4,7 +4,7 @@ import { ApiError } from './values.mjs'
 import { passwordDigest, verifyPassword } from './passwords.mjs'
 const sha = value => createHash('sha256').update(value).digest('hex')
 const publicUser = a => ({ uid: a.Uid, email: a.Email, emailVerified: !!a.EmailVerified, displayName: a.DisplayName || '', photoURL: a.PhotoUrl || '', mustChangePassword: !!a.MustChangePassword })
-export function createAuth(database, config) {
+export function createAuth(database, config, central) {
   const cookieName = config.secureCookies ? '__Host-agentes3d' : 'agentes3d_local'
   const cookieOptions = { httpOnly: true, secure: config.secureCookies, sameSite: 'strict', path: '/' }
   const dummy = passwordDigest(randomBytes(24).toString('hex'))
@@ -12,6 +12,7 @@ export function createAuth(database, config) {
   let runningChecks = 0
   return {
     async register(req) {
+      if(central?.enabled)throw new ApiError(403,'auth/central-required','Administra tu acceso desde Portal iqualitys.')
       const { email, token, password } = req.body || {}
       if (typeof email !== 'string' || email.length > 320 || typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token) || typeof password !== 'string' || password.length < 12 || password.length > 256) throw new ApiError(400, 'invalid-argument')
       if (runningChecks >= 4) throw new ApiError(429, 'auth/too-many-requests')
@@ -52,9 +53,11 @@ export function createAuth(database, config) {
       const result = await new sql.Request(await database.pool()).input('token', sql.Char(64), sha(token)).query('SELECT a.*,s.CreatedAt AS SessionCreatedAt FROM app.Sessions s JOIN app.Accounts a ON a.Uid=s.Uid AND a.CredentialVersion=s.CredentialVersion WHERE s.TokenHash=@token AND s.ExpiresAt>SYSUTCDATETIME() AND a.Disabled=0')
       const account = result.recordset[0]
       if (!account) throw new ApiError(401, 'unauthenticated')
+      await central?.validate(req,account.Uid,sha(token))
       return { ...publicUser(account), tokenHash: sha(token), sessionCreatedAt: account.SessionCreatedAt }
     },
-    async login(req, res) {
+    async login(req, res, authorizeAccount) {
+      if(central?.enabled)throw new ApiError(403,'auth/central-required','Inicia sesión desde Portal iqualitys.')
       const { email, password, remember = false } = req.body || {}
       if (typeof email !== 'string' || email.length > 320 || typeof password !== 'string' || password.length > 1024) throw new ApiError(400, 'invalid-argument')
       const key = `${req.ip}:${sha(email.toLowerCase())}`, now = Date.now()
@@ -71,6 +74,7 @@ export function createAuth(database, config) {
           if (account) await new sql.Request(pool).input('uid', sql.NVarChar(128), account.Uid).query('UPDATE app.Accounts SET FailedLogins=FailedLogins+1,LockedUntil=CASE WHEN FailedLogins>=7 THEN DATEADD(minute,10,SYSUTCDATETIME()) ELSE LockedUntil END WHERE Uid=@uid')
           throw new ApiError(401, 'auth/invalid-credential')
         }
+        if(authorizeAccount)await authorizeAccount(account)
         const token = randomBytes(32).toString('base64url'), expires = new Date(now + (remember ? 7 * 86400e3 : 8 * 3600e3))
         await new sql.Request(pool).input('uid', sql.NVarChar(128), account.Uid).input('hash', sql.Char(64), sha(token)).input('version', sql.Int, account.CredentialVersion).input('expires', sql.DateTime2, expires)
           .query('UPDATE app.Accounts SET FailedLogins=0,LockedUntil=NULL WHERE Uid=@uid; INSERT INTO app.Sessions(TokenHash,Uid,CredentialVersion,ExpiresAt) VALUES(@hash,@uid,@version,@expires)')
@@ -82,15 +86,18 @@ export function createAuth(database, config) {
     async logout(actor, res) {
       if (!actor.worker) await new sql.Request(await database.pool()).input('hash', sql.Char(64), actor.tokenHash).query('DELETE FROM app.Sessions WHERE TokenHash=@hash')
       res.clearCookie(cookieName, cookieOptions)
+      central?.clear(res)
     },
-    async changePassword(actor, body, res) {
-      if (actor.worker || Date.now() - new Date(actor.sessionCreatedAt).getTime() > 5 * 60e3) throw new ApiError(401, 'auth/requires-recent-login')
-      const password = body?.password
-      if (typeof password !== 'string' || password.length < 12 || password.length > 256 || password.toLowerCase().includes('solo-emulador')) throw new ApiError(400, 'auth/weak-password', 'Usa una contraseña nueva de al menos 12 caracteres.')
-      const digest = await passwordDigest(password)
-      await new sql.Request(await database.pool()).input('uid', sql.NVarChar(128), actor.uid).input('digest', sql.VarChar(300), digest)
-        .query('UPDATE app.Accounts SET PasswordDigest=@digest,MustChangePassword=0,CredentialVersion=CredentialVersion+1 WHERE Uid=@uid; DELETE FROM app.Sessions WHERE Uid=@uid')
-      res.clearCookie(cookieName, cookieOptions)
+    async centralSession(uid,res) {
+      const pool=await database.pool()
+      const account=(await new sql.Request(pool).input('uid',sql.NVarChar(128),uid).query('SELECT * FROM app.Accounts WHERE Uid=@uid AND Disabled=0')).recordset[0]
+      if(!account||account.MustChangePassword||(account.LockedUntil&&new Date(account.LockedUntil)>new Date()))throw new ApiError(403,'auth/account-not-ready','La cuenta vinculada requiere revisión del administrador.')
+      const token=randomBytes(32).toString('base64url'),expiresAt=Date.now()+8*3600e3
+      await new sql.Request(pool).input('uid',sql.NVarChar(128),account.Uid).input('hash',sql.Char(64),sha(token)).input('version',sql.Int,account.CredentialVersion).input('expires',sql.DateTime2,new Date(expiresAt)).query('INSERT INTO app.Sessions(TokenHash,Uid,CredentialVersion,ExpiresAt) VALUES(@hash,@uid,@version,@expires)')
+      res.cookie(cookieName,token,{...cookieOptions,maxAge:8*3600e3})
+      return{localId:account.Uid,tokenHash:sha(token),expiresAt}
     },
+    clearSessionCookie(res) { res.clearCookie(cookieName, cookieOptions) },
+
   }
 }

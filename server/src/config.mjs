@@ -1,3 +1,4 @@
+import {centralConfiguration} from './central-connector.mjs'
 const required = (env, name) => {
   const value = env[name]
   if (typeof value !== 'string' || !value.trim()) throw new Error(`Falta ${name}`)
@@ -22,7 +23,7 @@ export function databaseConfig(env = process.env) {
   const connectionString = [
     `Driver=${brace(driver)}`, `Server=${brace(`tcp:${server},${integer(env.CORE_DB_PORT, 'CORE_DB_PORT', 1, 65535)}`)}`,
     `Database=${brace(database)}`, 'Trusted_Connection=Yes', 'Encrypt=Yes', 'TrustServerCertificate=No',
-    'ApplicationIntent=ReadWrite', 'APP={Agentes IA 3D}',
+    'ApplicationIntent=ReadWrite', 'APP={Stackbi Office}',
   ].join(';') + ';'
   return { connectionString, connectionTimeout: 10000, requestTimeout: 15000, pool: { min: 0, max: 3, idleTimeoutMillis: 30000 } }
 }
@@ -34,10 +35,14 @@ export function applicationConfig(env = process.env) {
   if (workerToken.length < 48) throw new Error('WORKER_API_TOKEN requiere al menos 48 caracteres aleatorios')
   return {
     origin: origin.origin, secureCookies: !localHttp, host: '127.0.0.1',
+    central: centralConfiguration(env,'office',origin.origin),
     port: integer(env.PORT ?? 10011, 'PORT', 1024, 65535), workerToken,
     workerUid: required(env, 'WORKER_UID'), workerEmail: required(env, 'WORKER_EMAIL').toLowerCase(),
     ownerUid: required(env, 'APP_OWNER_UID'),
     maxDocuments: 5000, maxBodyBytes: 2 * 1024 * 1024,
     staticRoot: env.APP_STATIC_ROOT || '',
+    securityCodeSecret: env.APP_SECURITY_CODE_SECRET || '',
+    ownerEmailRecovery: env.APP_OWNER_EMAIL_RECOVERY ? JSON.parse(env.APP_OWNER_EMAIL_RECOVERY) : null,
+    securityMail: { apiKey: env.APP_BREVO_API_KEY || '', sender: env.APP_MAIL_SENDER || '', senderName: env.APP_MAIL_SENDER_NAME || 'Stackbi Office' },
   }
 }

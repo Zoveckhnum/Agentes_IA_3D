@@ -4,6 +4,7 @@ import { onAuthStateChanged, signInWithPopup, signInWithEmailAndPassword, signOu
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp, collection, onSnapshot, orderBy, query, getDocs } from './data/firestore.js'
 import { useLocalSql } from './data/mode.js'
 import PasswordChangePage from './pages/PasswordChangePage.jsx'
+import {OfficeAvailabilityGuard} from './components/OfficePower.jsx'
 
 import LoginPage from './pages/LoginPage.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -308,6 +309,7 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctxValue}>
+      <OfficeAvailabilityGuard />
       <div className="app-layout">
         {/* Banner modo empleado */}
         {viewAsEmployee && (
@@ -351,7 +353,7 @@ export default function App() {
         {/* Footer */}
         <footer className="app-footer">
           <span>{BRAND.appName} v{APP_VERSION}</span>
-          <span><strong>{BRAND.company}</strong> © {new Date().getFullYear()} · Hecho con <a href="https://github.com/ederland/Agentes_IA_3D" target="_blank" rel="noreferrer">Agentes IA 3D</a> (código abierto)</span>
+          <span><strong>{BRAND.company}</strong> © {new Date().getFullYear()} · Hecho con <a href="https://github.com/ederland/Agentes_IA_3D" target="_blank" rel="noreferrer">Stackbi Office</a> (código abierto)</span>
         </footer>
 
         <PomodoroWidget />
